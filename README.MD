@@ -10,7 +10,9 @@ This project is used to generate Azure resources based on the configuration prov
 
 ## Overview
 
-The project uses three main files: `config.py`, `main.py`, and `azurenative.py`. This is in active development so please pull it and setup Azure/Pulumi accounts. Test building multiples to catch edge cases and help out :)
+The project uses three main files: `config.py`, `main.py`, and `azurenative.py`. 
+
+This is in active development so please consider contributing by cloning. Setup Azure/Pulumi accounts, test building multiples to catch edge cases and help out :)
 
 ### `config.py`
 
