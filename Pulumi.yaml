@@ -1,0 +1,6 @@
+name: pulumi-azure
+runtime:
+  name: python
+  options:
+    virtualenv: venv
+description: MVC Project for Pulumi use with Azure Cloud

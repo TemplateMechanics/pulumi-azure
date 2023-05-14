@@ -1,0 +1,5 @@
+teams:
+  - name: team1
+    services:
+      - name: service1
+        environments: []
