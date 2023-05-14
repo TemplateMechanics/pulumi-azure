@@ -6,7 +6,6 @@ This project is used to generate Azure resources based on the configuration prov
 
 - Python 3.7 or above
 - Pulumi CLI (install from [official website](https://www.pulumi.com/docs/get-started/install/))
-- Azure SDK for Python
 
 ## Overview
 
@@ -24,7 +23,7 @@ This file contains the main logic of the program. It reads the `config.yaml`, pa
 
 ### `azurenative.py`
 
-This file contains the `ResourceBuilder` class, which is used to generate Azure resources based on the provided configuration. 
+This file contains the `ResourceBuilder` class, which is used to generate Azure resources based on the provided configuration.
 
 ## Usage
 
@@ -40,7 +39,7 @@ pulumi preview
 ```bash
 pulumi up
 ```
-This will iterate through each environment defined in the config.yaml and generate the resources using Pulumi and the Azure SDK for Python.
+This will iterate through each environment defined in the config.yaml and generate the resources using Pulumi
 
 ## Example
 An Example `config.yaml` could look like:
@@ -67,10 +66,51 @@ teams:
               count: 1
 ```
 This would generate a managed cluster named "Cluster1" in the resource group "RG1" in the "Dev" environment of the "Service1" service in "Team1".
-### `azurenative.py`
 
-This is the script that is responsible for building the Azure resources based on the configuration set in `config.yaml`. It uses the Azure SDK for Python to interact with Azure and manage resources.
+## Explanation
 
+This section serves to help understand some aspects of the code that may not be familiar to folks coming from a non-programming background:
+```python
+    async def replaceInputArgs(self, args: any):
+        properties = [a for a in dir(args) if not a.startswith('__') and not callable(getattr(args, a))]
+        for property in properties:
+            value = getattr(args, property)
+            if value is not None:
+
+                # loop iterables
+                if (isinstance(value, Iterable)):
+                    for item in value:
+                        await self.replaceInputArgs(item)
+
+                # deep replace on all child dataclasses
+                if (dataclasses.is_dataclass(value)):
+                    await self.replaceInputArgs(value)
+
+                # only replace values for strings
+                if isinstance(value, str):
+                    await self.replaceValue(args, property, value)
+```
+This section of the code is an asynchronous method called `replaceInputArgs` in the `ResourceBuilder` class. The purpose of this method is to iterate over the properties of an input argument object and recursively replace any string values.
+
+Let's break down the method:
+
+- `properties = [a for a in dir(args) if not a.startswith('__') and not callable(getattr(args, a))]`: This line is using a list comprehension to get a list of all the properties in the `args` object. The `dir()` function is used to get a list of all attributes of the object. The list comprehension filters out any attributes that start with '__' (these are usually system attributes), and any attributes that are callable (i.e., methods).
+
+- `for property in properties`: This line starts a loop over all the properties that were just defined.
+
+- `value = getattr(args, property)`: For each property, this line gets the current value of the property.
+
+- `if value is not None`: This line checks if the current value is not `None`. If it is `None`, the loop simply continues to the next property.
+
+- `if (isinstance(value, Iterable))`: This line checks if the current value is an iterable (like a list or a dictionary). If it is, the method calls itself recursively for each item in the iterable.
+
+- `if (dataclasses.is_dataclass(value))`: This line checks if the current value is a dataclass. If it is, the method again calls itself recursively, because a dataclass can have its own properties that might need to be replaced.
+
+- `if isinstance(value, str)`: Finally, this line checks if the current value is a string. If it is, the method calls another method, `replaceValue()`, to replace the string value.
+
+This process is repeated for all properties in the `args` object and all their child properties if they are iterable or dataclasses, until all string values have been replaced.
+
+This is the script that is responsible for building the Azure resources based on the configuration set in `config.yaml`.
 Here's a high-level overview of its main components:
 
 - `ResourceBuilder`: This class is used to construct Azure resources according to the parsed configuration. It takes an instance of the `BuildContext` which carries details about the team, service, environment, and location. 
@@ -100,7 +140,7 @@ You might have noticed that the `AzureNative` object includes lists of different
 
 Each of these objects has properties that match the options available for their respective Azure resources. For example, a `ManagedCluster` object has properties like `resource_group_name`, `network_profile`, `agent_pool_profiles`, and so on. These properties can be set in the `config.yaml` file.
 
-The actual implementation of the resource building process will depend on the specifics of your project and the Azure resources you are working with. Always refer to the [official Azure SDK for Python documentation](https://docs.microsoft.com/en-us/python/api/overview/azure/?view=azure-python) and the [Pulumi Azure-Native documentation](https://www.pulumi.com/registry/packages/azure-native/) for the most accurate and up-to-date information.
+The actual implementation of the resource building process will depend on the specifics of your project and the Azure resources you are working with. Always refer to the [Pulumi Azure-Native documentation](https://www.pulumi.com/registry/packages/azure-native/) for the most accurate and up-to-date information.
 
 Please note that you must have the Pulumi application installed on your computer and properly set up to interact with your Azure account. You can check your setup by running `pulumi whoami` in your command line, which should return your Pulumi account username.
 
