@@ -1,4 +1,4 @@
-# Azure Resource Generation Project
+# Pulumi Azure Template
 
 This project is used to generate Azure resources based on the configuration provided in the `config.yaml` file, using Pulumi. 
 
