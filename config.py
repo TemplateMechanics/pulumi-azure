@@ -1,10 +1,26 @@
 from dataclass_wizard import YAMLWizard
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
+
+@dataclass
+class ManagedClusterSKUArgs:
+    name: Optional[str] = None
+    tier: Optional[str] = None
+@dataclass
+class ManagedClusterServicePrincipalProfileArgs:
+    client_id: Optional[str] = None
+    secret: Optional[str] = None
+@dataclass
+class NetworkProfileArgs:
+    network_plugin: Optional[str] = None
+    service_cidr: Optional[str] = None
+    dns_service_ip: Optional[str] = None
+    docker_bridge_cidr: Optional[str] = None
 @dataclass
 class IdentityArgs:
     type: Optional[str] = None
     user_assigned_identities: Optional[dict[str, str]] = None
+
 @dataclass
 class AgentPoolProfileArgs:
     name: Optional[str] = None
@@ -20,25 +36,29 @@ class AgentPoolProfileArgs:
     vnet_subnet_id: Optional[str] = None
     orchestrator_version: Optional[str] = None
 @dataclass
+class AddonProfileArgs:
+    enabled: Optional[bool] = None
+    config: Optional[dict[str, str]] = None
+@dataclass
 class AADProfileArgs:
     managed: Optional[bool] = None
     admin_group_object_ids: Optional[list[str]] = None
 @dataclass
-class NetworkProfileArgs:
-    network_plugin: Optional[str] = None
-    service_cidr: Optional[str] = None
-    dns_service_ip: Optional[str] = None
-    docker_bridge_cidr: Optional[str] = None
-@dataclass
 class ManagedClusterArgs:
-    resource_group_name: Optional[str] = None
-    network_profile: Optional[NetworkProfileArgs] = None
-    agent_pool_profiles: Optional[list[AgentPoolProfileArgs]] = None
-    enable_rbac: Optional[bool] = None
     aad_profile: Optional[AADProfileArgs] = None
+    addon_profiles: Optional[dict[str, str]] = None
+    agent_pool_profiles: Optional[list[AgentPoolProfileArgs]] = None
+    disable_local_accounts: Optional[bool] = None
+    enable_pod_security_policy: Optional[bool] = None
+    enable_rbac: Optional[bool] = None
+    fqdn_subdomain: Optional[str] = None
     identity: Optional[IdentityArgs] = None
-    identity_profile: Optional[dict[str, str]] = None
+    location: Optional[str] = None
+    network_profile: Optional[NetworkProfileArgs] = None
+    resource_group_name: Optional[str] = None
+    sku: Optional[ManagedClusterSKUArgs] = None
     tags: Optional[dict[str, str]] = None
+    windows_profile: Optional[dict[str, str]] = None
 @dataclass
 class ManagedCluster:
     name: str
@@ -97,8 +117,11 @@ class Subnet:
     args: Optional[SubnetInitArgs] = None
 ### https://www.pulumi.com/registry/packages/azure-native/api-docs/network/subnet/ ###
 @dataclass
+class AddressSpaceArgs:
+    address_prefixes: Optional[list[str]] = None
+@dataclass
 class VirtualNetworkArgs:
-    address_space: Optional[list[str]] = None
+    address_space: Optional[AddressSpaceArgs] = None
     location: Optional[str] = None
     resource_group_name: Optional[str] = None
     tags: Optional[dict[str, str]] = None

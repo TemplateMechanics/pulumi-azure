@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 import re
 from collections.abc import Iterable
 import uuid
+import secrets
+import string
 
 import pulumi
 import pulumi_azure_native.resources as resources
@@ -42,6 +44,11 @@ class BuildContext:
 
     def get_default_resource_name_clean(self, unique_identifier: str) -> str:
         return self.get_default_resource_name(unique_identifier).replace("-", "")
+    
+    def generate_password(length=16):
+        all_characters = string.ascii_letters + string.digits + string.punctuation
+        password = ''.join(secrets.choice(all_characters) for _ in range(length))
+        return password
 
 # region Resources
 class BaseResource(ABC):
@@ -178,12 +185,18 @@ class VirtualNetwork(BaseResource):
         return network.VirtualNetwork.get(self.context.get_default_resource_name(self.name), id)
 
     async def create(self, args: config.VirtualNetworkArgs) -> network.VirtualNetwork:
+
+        address_space_args = network.AddressSpaceArgs(
+            address_prefixes = args.address_space.address_prefixes or pulumi.log.warn("address_prefixes is required for virtual network creation"),
+        )
+
         virtual_network_args = network.VirtualNetworkArgs(
             resource_group_name = args.resource_group_name or pulumi.log.warn("Resource Group Name is required for virtual network"),
             location = args.location or self.context.location,
-            address_space = args.address_space or pulumi.log.warn("address_space is required for virtual network creation"),
+            address_space = address_space_args,
             tags = args.tags or self.context.tags,
         )
+        
         return network.VirtualNetwork(self.context.get_default_resource_name(self.name), args=virtual_network_args)
 
 class Subnet(BaseResource):
@@ -277,31 +290,36 @@ class ManagedCluster(BaseResource):
         location = args.location
         if location is None:
             location = self.context.location
+        tags = args.tags
         if tags is None:
             tags = self.context.tags
-
-        network_profile_args : Optional[containerservice.ContainerServiceNetworkProfileArgs] = None
-        if args.network_profile is not None:
-            network_profile_args = containerservice.ContainerServiceNetworkProfileArgs(
-                network_plugin = args.network_profile.network_plugin if args.network_profile.network_plugin is not None else "azure",
-                service_cidr = args.network_profile.service_cidr if args.network_profile.service_cidr is not None else "10.201.0.0/24",
-                dns_service_ip = args.network_profile.dns_service_ip if args.network_profile.dns_service_ip is not None else "10.201.0.100",
-                docker_bridge_cidr = args.network_profile.docker_bridge_cidr if args.network_profile.docker_bridge_cidr is not None else "10.202.0.0/24"
-            )
-
+        disable_local_accounts = args.disable_local_accounts
+        if disable_local_accounts is None:
+            disable_local_accounts = False
+        enable_pod_security_policy = args.enable_pod_security_policy
+        if enable_pod_security_policy is None:
+            enable_pod_security_policy = False
+        enable_rbac = args.enable_rbac
+        if enable_rbac is None:
+            enable_rbac = False
+        fqdn_subdomain = args.fqdn_subdomain
+        if fqdn_subdomain is None:
+            fqdn_subdomain = None
+        
         aad_profile_args : Optional[containerservice.ManagedClusterAADProfileArgs] = None
         if args.aad_profile is not None:
             aad_profile_args = containerservice.ManagedClusterAADProfileArgs(
                 managed = args.aad_profile.managed,
                 admin_group_object_ids = args.aad_profile.admin_group_object_ids
             )
-
-        identity_args : Optional[containerservice.ManagedClusterIdentityArgs] = None
-        if args.identity is not None:
-            identity_args = containerservice.ManagedClusterIdentityArgs(
-                type = args.identity.type if args.identity.type is not None else "SystemAssigned",
-                # user_assigned_identities = args.identity.user_assigned_identities if args.identity.user_assigned_identities is not None else {}
-            )
+        
+        addon_profiles_args : Optional[containerservice.ManagedClusterAddonProfileArgs] = None
+        if args.addon_profiles is not None:
+            for addon_profile in args.addon_profiles:
+                addon_profiles_args = containerservice.ManagedClusterAddonProfileArgs(
+                    config = addon_profile.config if addon_profile.config is not None else {},
+                    enabled = addon_profile.enabled if addon_profile.enabled is not None else False
+                )
 
         agent_pool_profiles_args : list[containerservice.ManagedClusterAgentPoolProfileArgs] = []
         if args.agent_pool_profiles is not None:
@@ -322,37 +340,65 @@ class ManagedCluster(BaseResource):
                 )
                 agent_pool_profiles_args.append(agent_pool_profile_args)
 
+        identity_args : Optional[containerservice.ManagedClusterIdentityArgs] = None
+        if args.identity is not None:
+            identity_args = containerservice.ManagedClusterIdentityArgs(
+                type = args.identity.type if args.identity.type is not None else "SystemAssigned",
+                # user_assigned_identities = args.identity.user_assigned_identities if args.identity.user_assigned_identities is not None else {}
+            )
+
+        sku_args : Optional[containerservice.ManagedClusterSKUArgs] = None
+        if args.sku is not None:
+            sku_args = containerservice.ManagedClusterSKUArgs(
+                name = args.sku.name if args.sku.name is not None else "Basic",
+                tier = args.sku.tier if args.sku.tier is not None else "Free"
+            )
+
+        network_profile_args : Optional[containerservice.ContainerServiceNetworkProfileArgs] = None
+        if args.network_profile is not None:
+            network_profile_args = containerservice.ContainerServiceNetworkProfileArgs(
+                network_plugin = args.network_profile.network_plugin if args.network_profile.network_plugin is not None else "azure",
+                service_cidr = args.network_profile.service_cidr if args.network_profile.service_cidr is not None else "10.201.0.0/24",
+                dns_service_ip = args.network_profile.dns_service_ip if args.network_profile.dns_service_ip is not None else "10.201.0.100",
+                docker_bridge_cidr = args.network_profile.docker_bridge_cidr if args.network_profile.docker_bridge_cidr is not None else "10.202.0.0/24"
+            )
+
+        windows_profile_args : Optional[containerservice.ManagedClusterWindowsProfileArgs] = None
+        if args.windows_profile is not None:
+            windows_profile_args = containerservice.ManagedClusterWindowsProfileArgs(
+                admin_username = args.windows_profile.admin_username if args.windows_profile.admin_username is not None else "azureuser",
+                admin_password = self.context.generate_password() if args.windows_profile.admin_password is None else pulumi.log.warn("admin_password is required for windows_profile creation")
+            )
+
         return containerservice.ManagedCluster(
-            aad_profile = aad_profile_args,
-            # addon_profiles: Optional[Mapping[str, ManagedClusterAddonProfileArgs]] = None,
-            agent_pool_profiles = agent_pool_profiles_args,
+            # disable_local_accounts = Optional[bool] = None,
             # api_server_access_profile: Optional[ManagedClusterAPIServerAccessProfileArgs] = None,
             # auto_scaler_profile: Optional[ManagedClusterPropertiesAutoScalerProfileArgs] = None,
             # auto_upgrade_profile: Optional[ManagedClusterAutoUpgradeProfileArgs] = None,
-            # disable_local_accounts: Optional[bool] = None,
             # disk_encryption_set_id: Optional[str] = None,
-            # enable_pod_security_policy: Optional[bool] = None,
-            # enable_rbac: Optional[bool] = None,
+            # enable_pod_security_policy = Optional[bool] = None,
+            # enable_rbac = Optional[bool] = None,
             # extended_location: Optional[ExtendedLocationArgs] = None,
-            # fqdn_subdomain: Optional[str] = None,
+            # fqdn_subdomain = Optional[str] = None,
             # http_proxy_config: Optional[ManagedClusterHTTPProxyConfigArgs] = None,
-            identity = identity_args,
-            # identity_profile = identity_profile_args,
             # kubernetes_version: Optional[str] = None,
             # linux_profile: Optional[ContainerServiceLinuxProfileArgs] = None,
             # location: Optional[str] = None,
-            network_profile = network_profile_args,
             # node_resource_group: Optional[str] = None,
             # pod_identity_profile: Optional[ManagedClusterPodIdentityProfileArgs] = None,
             # private_link_resources: Optional[Sequence[PrivateLinkResourceArgs]] = None,
+            aad_profile = aad_profile_args,
+            addon_profiles = addon_profiles_args,
+            agent_pool_profiles = agent_pool_profiles_args,
+            dns_prefix = self.context.get_default_resource_name(self.name),
+            identity = identity_args,
+            location = location,
+            network_profile = network_profile_args,
             resource_group_name = args.resource_group_name,
             resource_name = self.context.get_default_resource_name(self.name) or args.resource_name,
-            location = location,
-            dns_prefix = self.context.get_default_resource_name(self.name),
-            # service_principal_profile: Optional[ManagedClusterServicePrincipalProfileArgs] = None,
-            # sku: Optional[ManagedClusterSKUArgs] = None,
-            tags = self.tags,
-            # windows_profile: Optional[ManagedClusterWindowsProfileArgs] = None
+            sku = sku_args,
+            tags = tags,
+            windows_profile = windows_profile_args
         )
 
 #endregion
