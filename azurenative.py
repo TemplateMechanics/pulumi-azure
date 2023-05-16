@@ -24,6 +24,7 @@ class BuildContext:
     service: str
     environment: str
     location: str
+    tags: dict[str, str]
 
     resource_cache: dict = field(init=False, repr=False, default_factory=dict)
 
@@ -119,6 +120,7 @@ class ResourceGroup(BaseResource):
         resource_group_args = resources.ResourceGroupArgs(
             resource_group_name = args.resource_group_name or self.context.get_default_resource_name(self.name),
             location = args.location or self.context.location,
+            tags = args.tags or self.context.tags,
         )
         return resources.ResourceGroup(self.context.get_default_resource_name(self.name), args=resource_group_args)
 
@@ -134,8 +136,9 @@ class ManagedIdentity(BaseResource):
 
     async def create(self, args: config.ManagedIdentityArgs) -> managedidentity.UserAssignedIdentity:
         managed_identity_args = managedidentity.UserAssignedIdentityArgs(
-            resource_group_name = args.resource_group_name or self.context.get_default_resource_name(self.name),
+            resource_group_name = args.resource_group_name or pulumi.log.warn("Resource Group Name is required for managed identity"),
             location = args.location or self.context.location,
+            tags = args.tags or self.context.tags,
         )
         return managedidentity.UserAssignedIdentity(self.context.get_default_resource_name(self.name), args=managed_identity_args)
 
@@ -153,10 +156,10 @@ class RoleAssignment(BaseResource):
         role_assignment_args = authorization.RoleAssignmentArgs(
             role_assignment_name= str(uuid.uuid4()),
             description = args.description or "",
-            principal_id = args.principal_id or "",
-            principal_type = args.principal_type or "",
-            role_definition_id = args.role_definition_id or "",
-            scope = args.scope or "",
+            principal_id = args.principal_id or pulumi.log.warn("Principal ID is required for role assignment"),
+            principal_type = args.principal_type or "ServicePrincipal",
+            role_definition_id = args.role_definition_id or pulumi.log.warn("Role definition ID is required for role assignment"),
+            scope = args.scope or pulumi.log.warn("Scope is required for role assignment"),
         )
         return authorization.RoleAssignment(
             self.context.get_default_resource_name(self.name), 
@@ -176,9 +179,10 @@ class VirtualNetwork(BaseResource):
 
     async def create(self, args: config.VirtualNetworkArgs) -> network.VirtualNetwork:
         virtual_network_args = network.VirtualNetworkArgs(
-            resource_group_name = args.resource_group_name or self.context.get_default_resource_name(self.name),
+            resource_group_name = args.resource_group_name or pulumi.log.warn("Resource Group Name is required for virtual network"),
             location = args.location or self.context.location,
             address_space = args.address_space or pulumi.log.warn("address_space is required for virtual network creation"),
+            tags = args.tags or self.context.tags,
         )
         return network.VirtualNetwork(self.context.get_default_resource_name(self.name), args=virtual_network_args)
 
@@ -194,8 +198,8 @@ class Subnet(BaseResource):
 
     async def create(self, args: config.SubnetInitArgs) -> network.Subnet:
         subnet_args = network.SubnetInitArgs(
-            resource_group_name = args.resource_group_name or self.context.get_default_resource_name(self.name),
-            virtual_network_name = args.virtual_network_name or self.context.get_default_resource_name(self.name),
+            resource_group_name = args.resource_group_name or pulumi.log.warn("Resource Group Name is required for subnet creation"),
+            virtual_network_name = args.virtual_network_name or pulumi.log.warn("Virtual Network Name is required for subnet creation"),
             address_prefix = args.address_prefix or pulumi.log.warn("address_prefix is required for subnet creation"),
         )
         return network.Subnet(self.context.get_default_resource_name(self.name), args=subnet_args)
@@ -223,7 +227,7 @@ class KeyVault(BaseResource):
                 enabled_for_disk_encryption=properties.enabled_for_disk_encryption if properties.enabled_for_disk_encryption is not None else True,
                 enabled_for_template_deployment=properties.enabled_for_template_deployment if properties.enabled_for_template_deployment is not None else True,
                 enable_rbac_authorization=properties.enable_rbac_authorization if properties.enable_rbac_authorization is not None else False,
-                enable_soft_delete=properties.enable_soft_delete if properties.enable_soft_delete is not None else False
+                enable_soft_delete=properties.enable_soft_delete if properties.enable_soft_delete is not None else False,
             )
 
         vault_args = keyvault.VaultArgs(
@@ -231,6 +235,7 @@ class KeyVault(BaseResource):
             vault_name=args.vault_name or self.context.get_default_resource_name(self.name),
             resource_group_name=args.resource_group_name or self.context.get_default_resource_name(self.name),
             location=args.location or self.context.location,
+            tags=args.tags or self.context.tags,
         )
 
         return keyvault.Vault(self.context.get_default_resource_name(self.name), args=vault_args)
@@ -252,6 +257,8 @@ class ContainerRegistry(BaseResource):
             sku=args.sku or containerregistry.SkuArgs(name="Standard"),
             admin_user_enabled=args.admin_user_enabled or False,
             network_rule_set=args.network_rule_set or {"default_action": "Allow"},
+            policies=args.policies or {"quarantine_policy": {"status": "disabled"}},
+            tags=args.tags or self.context.tags,
         )
 
         return containerregistry.Registry(self.context.get_default_resource_name_clean(self.name), registry_args)
@@ -270,6 +277,8 @@ class ManagedCluster(BaseResource):
         location = args.location
         if location is None:
             location = self.context.location
+        if tags is None:
+            tags = self.context.tags
 
         network_profile_args : Optional[containerservice.ContainerServiceNetworkProfileArgs] = None
         if args.network_profile is not None:
@@ -342,7 +351,7 @@ class ManagedCluster(BaseResource):
             dns_prefix = self.context.get_default_resource_name(self.name),
             # service_principal_profile: Optional[ManagedClusterServicePrincipalProfileArgs] = None,
             # sku: Optional[ManagedClusterSKUArgs] = None,
-            # tags: Optional[Mapping[str, str]] = None,
+            tags = self.tags,
             # windows_profile: Optional[ManagedClusterWindowsProfileArgs] = None
         )
 
@@ -353,6 +362,7 @@ class ResourceBuilder:
     def __init__(self, context: BuildContext):
         self.context = context
         self.location = context.location
+        self.tags = context.tags
 
     async def build(self, config: config.AzureNative):
         await self.build_resource_groups(config.resource_groups)

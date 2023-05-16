@@ -2,20 +2,6 @@ from dataclass_wizard import YAMLWizard
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
 @dataclass
-class RegistryArgs:
-    resource_group_name: Optional[str] = None
-    location: Optional[str] = None
-    admin_user_enabled: Optional[bool] = None
-    sku: Optional[dict[str, str]] = None
-    network_rule_set: Optional[dict[str, str]] = None
-    policies: Optional[dict[str, str]] = None
-@dataclass
-class containerregistry:
-    name: str
-    id: Optional[str] = None
-    args: Optional[RegistryArgs] = None
-### https://www.pulumi.com/registry/packages/azure-native/api-docs/containerregistry/registry/ ###
-@dataclass
 class IdentityArgs:
     type: Optional[str] = None
     user_assigned_identities: Optional[dict[str, str]] = None
@@ -60,6 +46,21 @@ class ManagedCluster:
     args: Optional[ManagedClusterArgs] = None
 ### https://www.pulumi.com/registry/packages/azure-native/api-docs/containerservice/managedcluster/ ###
 @dataclass
+class RegistryArgs:
+    resource_group_name: Optional[str] = None
+    location: Optional[str] = None
+    admin_user_enabled: Optional[bool] = None
+    sku: Optional[dict[str, str]] = None
+    network_rule_set: Optional[dict[str, str]] = None
+    policies: Optional[dict[str, str]] = None
+    tags: Optional[dict[str, str]] = None
+@dataclass
+class containerregistry:
+    name: str
+    id: Optional[str] = None
+    args: Optional[RegistryArgs] = None
+### https://www.pulumi.com/registry/packages/azure-native/api-docs/containerregistry/registry/ ###
+@dataclass
 class VaultPropertiesArgs:
     sku: Optional[dict[str, str]] = None
     tenant_id: Optional[str] = None
@@ -76,6 +77,7 @@ class KeyVaultArgs:
     resource_group_name: Optional[str] = None
     location:  Optional[str] = None
     properties: Optional[VaultPropertiesArgs] = None
+    tags: Optional[dict[str, str]] = None
 @dataclass
 class KeyVault:
     name: str
@@ -99,6 +101,7 @@ class VirtualNetworkArgs:
     address_space: Optional[list[str]] = None
     location: Optional[str] = None
     resource_group_name: Optional[str] = None
+    tags: Optional[dict[str, str]] = None
 @dataclass
 class VirtualNetwork:
     name: str
@@ -135,6 +138,7 @@ class ManagedIdentity:
 class ResourceGroupArgs:
     resource_group_name: Optional[str] = None
     location: Optional[str] = None
+    tags: Optional[dict[str, str]] = None
 @dataclass
 class ResourceGroup:
     name: str

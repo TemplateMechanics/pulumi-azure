@@ -20,7 +20,7 @@ async def main():
             for environment in service.environments:
 
                 # AzureNative
-                context = BuildContext(team.name, service.name, environment.name, environment.location)
+                context = BuildContext(team.name, service.name, environment.name, environment.location, environment.tags or {})
                 builder = ResourceBuilder(context)
                 await builder.build(environment.azure_native)
 
