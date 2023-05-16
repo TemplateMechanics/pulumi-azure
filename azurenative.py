@@ -158,7 +158,11 @@ class RoleAssignment(BaseResource):
             role_definition_id = args.role_definition_id or "",
             scope = args.scope or "",
         )
-        return authorization.RoleAssignment(self.context.get_default_resource_name(self.name), args=role_assignment_args)
+        return authorization.RoleAssignment(
+            self.context.get_default_resource_name(self.name), 
+            args=role_assignment_args,
+            opts=pulumi.ResourceOptions(ignore_changes=["role_assignment_name"])
+        )
 
 class VirtualNetwork(BaseResource):
     def __init__(self, name: str, context: BuildContext):
