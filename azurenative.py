@@ -1,6 +1,6 @@
 import config
 import dataclasses
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from typing import Optional, Sequence, List
 from abc import ABC, abstractmethod
 import re
@@ -65,17 +65,31 @@ class BaseResource(ABC):
     async def create(self, args: any) -> pulumi.CustomResource:
         pass
 
+    async def getResourceValue(self, baseResource : pulumi.CustomResource, outputChain : str) -> Optional[str]:
+        outputs = outputChain.split("->")
+                
+        if baseResource is None:
+            return None      
+        
+        # loop through nested output parameters until we get to the last resource
+        for outputName in outputs[:-1]:
+            baseResource = getattr(baseResource, outputName)
+            if baseResource is None:
+                return None
+    
+        return getattr(baseResource, outputs[-1] )
+
     async def replaceValue(self, args : any, propertyName : str, value : str | pulumi.Output[any]) -> str:
         newValue : str = value
         m = re.search(r"Resource (.+),\s?(.+)", value)
         if m is not None:
             resource = await self.context.get_resource_from_cache(m.group(1))
-            newValue = getattr(resource, m.group(2)) or value
+            newValue = await self.getResourceValue(resource, m.group(2)) or newValue            
         else:
             m = re.search(r"Secret (.+)", value)
             if m is not None:
-              secret = pulumiConfig.require_secret(m.group(1))
-              newValue = secret or value
+                secret = pulumiConfig.require_secret(m.group(1))
+                newValue = secret or value
 
         if value != newValue:
             setattr(args, propertyName, newValue)
@@ -275,7 +289,7 @@ class ContainerRegistry(BaseResource):
         )
 
         return containerregistry.Registry(self.context.get_default_resource_name_clean(self.name), registry_args)
-
+    
 class ManagedCluster(BaseResource):
     def __init__(self, name: str, context: BuildContext):
         super().__init__(name, context)
@@ -287,39 +301,28 @@ class ManagedCluster(BaseResource):
         return containerservice.ManagedCluster.get(self.context.get_default_resource_name(self.name), id)
 
     async def create(self, args: config.ManagedClusterArgs) -> containerservice.ManagedCluster:
-        location = args.location
-        if location is None:
-            location = self.context.location
-        tags = args.tags
-        if tags is None:
-            tags = self.context.tags
-        disable_local_accounts = args.disable_local_accounts
-        if disable_local_accounts is None:
-            disable_local_accounts = False
-        enable_pod_security_policy = args.enable_pod_security_policy
-        if enable_pod_security_policy is None:
-            enable_pod_security_policy = False
-        enable_rbac = args.enable_rbac
-        if enable_rbac is None:
-            enable_rbac = False
-        fqdn_subdomain = args.fqdn_subdomain
-        if fqdn_subdomain is None:
-            fqdn_subdomain = None
-        
+        network_profile_args : Optional[containerservice.ContainerServiceNetworkProfileArgs] = None
+        if args.network_profile is not None:
+            network_profile_args = containerservice.ContainerServiceNetworkProfileArgs(
+                network_plugin = args.network_profile.network_plugin if args.network_profile.network_plugin is not None else "azure",
+                service_cidr = args.network_profile.service_cidr if args.network_profile.service_cidr is not None else "10.201.0.0/24",
+                dns_service_ip = args.network_profile.dns_service_ip if args.network_profile.dns_service_ip is not None else "10.201.0.100",
+                docker_bridge_cidr = args.network_profile.docker_bridge_cidr if args.network_profile.docker_bridge_cidr is not None else "10.202.0.0/24"
+            )
+
         aad_profile_args : Optional[containerservice.ManagedClusterAADProfileArgs] = None
         if args.aad_profile is not None:
             aad_profile_args = containerservice.ManagedClusterAADProfileArgs(
                 managed = args.aad_profile.managed,
                 admin_group_object_ids = args.aad_profile.admin_group_object_ids
             )
-        
-        addon_profiles_args : Optional[containerservice.ManagedClusterAddonProfileArgs] = None
-        if args.addon_profiles is not None:
-            for addon_profile in args.addon_profiles:
-                addon_profiles_args = containerservice.ManagedClusterAddonProfileArgs(
-                    config = addon_profile.config if addon_profile.config is not None else {},
-                    enabled = addon_profile.enabled if addon_profile.enabled is not None else False
-                )
+
+        identity_args : Optional[containerservice.ManagedClusterIdentityArgs] = None
+        if args.identity is not None:
+            identity_args = containerservice.ManagedClusterIdentityArgs(
+                type = args.identity.type if args.identity.type is not None else "SystemAssigned",
+                # user_assigned_identities = args.identity.user_assigned_identities if args.identity.user_assigned_identities is not None else {}
+            )
 
         agent_pool_profiles_args : list[containerservice.ManagedClusterAgentPoolProfileArgs] = []
         if args.agent_pool_profiles is not None:
@@ -340,65 +343,37 @@ class ManagedCluster(BaseResource):
                 )
                 agent_pool_profiles_args.append(agent_pool_profile_args)
 
-        identity_args : Optional[containerservice.ManagedClusterIdentityArgs] = None
-        if args.identity is not None:
-            identity_args = containerservice.ManagedClusterIdentityArgs(
-                type = args.identity.type if args.identity.type is not None else "SystemAssigned",
-                # user_assigned_identities = args.identity.user_assigned_identities if args.identity.user_assigned_identities is not None else {}
-            )
-
-        sku_args : Optional[containerservice.ManagedClusterSKUArgs] = None
-        if args.sku is not None:
-            sku_args = containerservice.ManagedClusterSKUArgs(
-                name = args.sku.name if args.sku.name is not None else "Basic",
-                tier = args.sku.tier if args.sku.tier is not None else "Free"
-            )
-
-        network_profile_args : Optional[containerservice.ContainerServiceNetworkProfileArgs] = None
-        if args.network_profile is not None:
-            network_profile_args = containerservice.ContainerServiceNetworkProfileArgs(
-                network_plugin = args.network_profile.network_plugin if args.network_profile.network_plugin is not None else "azure",
-                service_cidr = args.network_profile.service_cidr if args.network_profile.service_cidr is not None else "10.201.0.0/24",
-                dns_service_ip = args.network_profile.dns_service_ip if args.network_profile.dns_service_ip is not None else "10.201.0.100",
-                docker_bridge_cidr = args.network_profile.docker_bridge_cidr if args.network_profile.docker_bridge_cidr is not None else "10.202.0.0/24"
-            )
-
-        windows_profile_args : Optional[containerservice.ManagedClusterWindowsProfileArgs] = None
-        if args.windows_profile is not None:
-            windows_profile_args = containerservice.ManagedClusterWindowsProfileArgs(
-                admin_username = args.windows_profile.admin_username if args.windows_profile.admin_username is not None else "azureuser",
-                admin_password = self.context.generate_password() if args.windows_profile.admin_password is None else pulumi.log.warn("admin_password is required for windows_profile creation")
-            )
-
         return containerservice.ManagedCluster(
-            # disable_local_accounts = Optional[bool] = None,
+            aad_profile = aad_profile_args,
+            # addon_profiles: Optional[Mapping[str, ManagedClusterAddonProfileArgs]] = None,
+            agent_pool_profiles = agent_pool_profiles_args,
             # api_server_access_profile: Optional[ManagedClusterAPIServerAccessProfileArgs] = None,
             # auto_scaler_profile: Optional[ManagedClusterPropertiesAutoScalerProfileArgs] = None,
             # auto_upgrade_profile: Optional[ManagedClusterAutoUpgradeProfileArgs] = None,
+            # disable_local_accounts: Optional[bool] = None,
             # disk_encryption_set_id: Optional[str] = None,
-            # enable_pod_security_policy = Optional[bool] = None,
-            # enable_rbac = Optional[bool] = None,
+            # enable_pod_security_policy: Optional[bool] = None,
+            # enable_rbac: Optional[bool] = None,
             # extended_location: Optional[ExtendedLocationArgs] = None,
-            # fqdn_subdomain = Optional[str] = None,
+            # fqdn_subdomain: Optional[str] = None,
             # http_proxy_config: Optional[ManagedClusterHTTPProxyConfigArgs] = None,
+            identity = identity_args,
+            # identity_profile = identity_profile_args,
             # kubernetes_version: Optional[str] = None,
             # linux_profile: Optional[ContainerServiceLinuxProfileArgs] = None,
             # location: Optional[str] = None,
+            network_profile = network_profile_args,
             # node_resource_group: Optional[str] = None,
             # pod_identity_profile: Optional[ManagedClusterPodIdentityProfileArgs] = None,
             # private_link_resources: Optional[Sequence[PrivateLinkResourceArgs]] = None,
-            aad_profile = aad_profile_args,
-            addon_profiles = addon_profiles_args,
-            agent_pool_profiles = agent_pool_profiles_args,
-            dns_prefix = self.context.get_default_resource_name(self.name),
-            identity = identity_args,
-            location = location,
-            network_profile = network_profile_args,
             resource_group_name = args.resource_group_name,
             resource_name = self.context.get_default_resource_name(self.name) or args.resource_name,
-            sku = sku_args,
-            tags = tags,
-            windows_profile = windows_profile_args
+            location = self.context.location,
+            dns_prefix = self.context.get_default_resource_name(self.name),
+            # service_principal_profile: Optional[ManagedClusterServicePrincipalProfileArgs] = None,
+            # sku: Optional[ManagedClusterSKUArgs] = None,
+            tags = self.context.tags,
+            # windows_profile: Optional[ManagedClusterWindowsProfileArgs] = None
         )
 
 #endregion
@@ -481,7 +456,5 @@ class ResourceBuilder:
             return
 
         for config in configs:
-            if not hasattr(config.args, 'location') or config.args.location is None:
-                config.args.location = self.location
             builder = ManagedCluster(config.name, self.context)
             await builder.build(config.id, config.args)

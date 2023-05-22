@@ -1,5 +1,5 @@
-from dataclass_wizard import YAMLWizard
-from typing import Dict, Any, Optional
+from dataclass_wizard import YAMLWizard, asdict
+from typing import Dict, Any, Sequence ,Optional, List
 from dataclasses import dataclass, field
 
 @dataclass
@@ -22,7 +22,7 @@ class IdentityArgs:
     user_assigned_identities: Optional[dict[str, str]] = None
 
 @dataclass
-class AgentPoolProfileArgs:
+class ManagedClusterAgentPoolProfileArgs:
     name: Optional[str] = None
     mode: Optional[str] = None
     vm_size: Optional[str] = None
@@ -33,32 +33,40 @@ class AgentPoolProfileArgs:
     min_count: Optional[int] = None
     max_count: Optional[int] = None
     max_pods: Optional[int] = None
-    vnet_subnet_id: Optional[str] = None
+    os_type: Optional[str] = None
     orchestrator_version: Optional[str] = None
+    vnet_subnet_id: Optional[str] = None
+    # def to_dict(self):
+    #     return asdict(self)
 @dataclass
 class AddonProfileArgs:
     enabled: Optional[bool] = None
     config: Optional[dict[str, str]] = None
 @dataclass
-class AADProfileArgs:
+class ManagedClusterAADProfileArgs:
     managed: Optional[bool] = None
-    admin_group_object_ids: Optional[list[str]] = None
+    enable_azure_rbac: Optional[bool] = None
+    admin_group_object_ids: Optional[List[str]] = None
+    tenant_id: Optional[str] = None
 @dataclass
 class ManagedClusterArgs:
-    aad_profile: Optional[AADProfileArgs] = None
-    addon_profiles: Optional[dict[str, str]] = None
-    agent_pool_profiles: Optional[list[AgentPoolProfileArgs]] = None
+    aad_profile: Optional[ManagedClusterAADProfileArgs] = None
+    addon_profiles: Optional[dict[str, AddonProfileArgs]] = None
+    agent_pool_profiles: Optional[List[ManagedClusterAgentPoolProfileArgs]] = None
     disable_local_accounts: Optional[bool] = None
+    dns_prefix: Optional[str] = None
     enable_pod_security_policy: Optional[bool] = None
     enable_rbac: Optional[bool] = None
     fqdn_subdomain: Optional[str] = None
     identity: Optional[IdentityArgs] = None
+    kubernetes_version: Optional[str] = None
     location: Optional[str] = None
     network_profile: Optional[NetworkProfileArgs] = None
     resource_group_name: Optional[str] = None
     sku: Optional[ManagedClusterSKUArgs] = None
     tags: Optional[dict[str, str]] = None
     windows_profile: Optional[dict[str, str]] = None
+    vnet_subnet_id: Optional[str] = None
 @dataclass
 class ManagedCluster:
     name: str
@@ -90,7 +98,7 @@ class VaultPropertiesArgs:
     enable_rbac_authorization: Optional[bool] = None
     enable_soft_delete: Optional[bool] = None
     create_mode: Optional[str] = None
-    access_policies: Optional[list[dict[str, str]]] = None
+    access_policies: Optional[List[dict[str, str]]] = None
 @dataclass
 class KeyVaultArgs:
     vault_name: Optional[str] = None
@@ -118,7 +126,7 @@ class Subnet:
 ### https://www.pulumi.com/registry/packages/azure-native/api-docs/network/subnet/ ###
 @dataclass
 class AddressSpaceArgs:
-    address_prefixes: Optional[list[str]] = None
+    address_prefixes: Optional[List[str]] = None
 @dataclass
 class VirtualNetworkArgs:
     address_space: Optional[AddressSpaceArgs] = None
@@ -170,14 +178,14 @@ class ResourceGroup:
 ### https://www.pulumi.com/registry/packages/azure-native/api-docs/resources/resourcegroup/ ###
 @dataclass
 class AzureNative:
-    resource_groups: Optional[list[ResourceGroup]] = None
-    managed_identities: Optional[list[ManagedIdentity]] = None
-    role_assignments: Optional[list[RoleAssignment]] = None
-    virtual_networks: Optional[list[VirtualNetwork]] = None
-    subnets: Optional[list[Subnet]] = None
-    key_vaults: Optional[list[KeyVault]] = None
-    container_registries: Optional[list[containerregistry]] = None
-    managed_clusters: Optional[list[ManagedCluster]] = None
+    resource_groups: Optional[List[ResourceGroup]] = None
+    managed_identities: Optional[List[ManagedIdentity]] = None
+    role_assignments: Optional[List[RoleAssignment]] = None
+    virtual_networks: Optional[List[VirtualNetwork]] = None
+    subnets: Optional[List[Subnet]] = None
+    key_vaults: Optional[List[KeyVault]] = None
+    container_registries: Optional[List[containerregistry]] = None
+    managed_clusters: Optional[List[ManagedCluster]] = None
 ### https://www.pulumi.com/registry/packages/azure-native/ ###
 @dataclass
 class Environment:
@@ -188,12 +196,12 @@ class Environment:
 @dataclass
 class Service:
     name: str
-    environments: list[Environment]
+    environments: List[Environment]
 @dataclass
 class Team:
     name: str
-    services: list[Service]
+    services: List[Service]
 @dataclass
 class Config(YAMLWizard):
-    teams: list[Team]
+    teams: List[Team]
 ### Base Config ###
