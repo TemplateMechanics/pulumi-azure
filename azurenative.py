@@ -299,83 +299,39 @@ class ManagedCluster(BaseResource):
             return None
 
         return containerservice.ManagedCluster.get(self.context.get_default_resource_name(self.name), id)
-
+    
     async def create(self, args: config.ManagedClusterArgs) -> containerservice.ManagedCluster:
-        network_profile_args : Optional[containerservice.ContainerServiceNetworkProfileArgs] = None
-        if args.network_profile is not None:
-            network_profile_args = containerservice.ContainerServiceNetworkProfileArgs(
-                network_plugin = args.network_profile.network_plugin if args.network_profile.network_plugin is not None else "azure",
-                service_cidr = args.network_profile.service_cidr if args.network_profile.service_cidr is not None else "10.201.0.0/24",
-                dns_service_ip = args.network_profile.dns_service_ip if args.network_profile.dns_service_ip is not None else "10.201.0.100",
-                docker_bridge_cidr = args.network_profile.docker_bridge_cidr if args.network_profile.docker_bridge_cidr is not None else "10.202.0.0/24"
-            )
-
-        aad_profile_args : Optional[containerservice.ManagedClusterAADProfileArgs] = None
-        if args.aad_profile is not None:
-            aad_profile_args = containerservice.ManagedClusterAADProfileArgs(
-                managed = args.aad_profile.managed,
-                admin_group_object_ids = args.aad_profile.admin_group_object_ids
-            )
-
-        identity_args : Optional[containerservice.ManagedClusterIdentityArgs] = None
-        if args.identity is not None:
-            identity_args = containerservice.ManagedClusterIdentityArgs(
-                type = args.identity.type if args.identity.type is not None else "SystemAssigned",
-                # user_assigned_identities = args.identity.user_assigned_identities if args.identity.user_assigned_identities is not None else {}
-            )
-
-        agent_pool_profiles_args : list[containerservice.ManagedClusterAgentPoolProfileArgs] = []
+        agent_pool_profiles_args: list[containerservice.ManagedClusterAgentPoolProfileArgs] = []
         if args.agent_pool_profiles is not None:
             for agent_pool_profile in args.agent_pool_profiles:
-                agent_pool_profile_args : containerservice.ManagedClusterAgentPoolProfileArgs = containerservice.ManagedClusterAgentPoolProfileArgs(
-                    name = agent_pool_profile.name,
-                    mode = agent_pool_profile.mode if agent_pool_profile.mode is not None else "System",
-                    vm_size = agent_pool_profile.vm_size if agent_pool_profile.vm_size is not None else "Standard_b2ms",
-                    type = agent_pool_profile.type if agent_pool_profile.type is not None else "VirtualMachineScaleSets",
-                    enable_auto_scaling = agent_pool_profile.enable_auto_scaling if agent_pool_profile.enable_auto_scaling is not None else True,
-                    enable_encryption_at_host = agent_pool_profile.enable_encryption_at_host if agent_pool_profile.enable_encryption_at_host is not None else False,
-                    count = agent_pool_profile.count if agent_pool_profile.count is not None else 1,
-                    min_count = agent_pool_profile.min_count if agent_pool_profile.min_count is not None else 1,
-                    max_count = agent_pool_profile.max_count if agent_pool_profile.max_count is not None else 3,
-                    max_pods = agent_pool_profile.max_pods if agent_pool_profile.max_pods is not None else 30,
-                    vnet_subnet_id = agent_pool_profile.vnet_subnet_id if agent_pool_profile.vnet_subnet_id is not None else pulumi.log.warn("vnet_subnet_id is required for agent_pool_profile creation"),
-                    orchestrator_version = agent_pool_profile.orchestrator_version if agent_pool_profile.orchestrator_version is not None else "1.24.10",
+                agent_pool_profile_args = containerservice.ManagedClusterAgentPoolProfileArgs(
+                    name=agent_pool_profile.name if agent_pool_profile.name is not None else "systempool",
+                    mode=agent_pool_profile.mode if agent_pool_profile.mode is not None else "System",
+                    vm_size=agent_pool_profile.vm_size if agent_pool_profile.vm_size is not None else "Standard_b2ms",
+                    type=agent_pool_profile.type if agent_pool_profile.type is not None else "VirtualMachineScaleSets",
+                    enable_auto_scaling=agent_pool_profile.enable_auto_scaling if agent_pool_profile.enable_auto_scaling is not None else True,
+                    enable_encryption_at_host=agent_pool_profile.enable_encryption_at_host if agent_pool_profile.enable_encryption_at_host is not None else False,
+                    count=agent_pool_profile.count if agent_pool_profile.count is not None else 1,
+                    min_count=agent_pool_profile.min_count if agent_pool_profile.min_count is not None else 1,
+                    max_count=agent_pool_profile.max_count if agent_pool_profile.max_count is not None else 3,
+                    max_pods=agent_pool_profile.max_pods if agent_pool_profile.max_pods is not None else 30,
+                    os_type=agent_pool_profile.os_type if agent_pool_profile.os_type is not None else "Linux",
+                    orchestrator_version=agent_pool_profile.orchestrator_version if agent_pool_profile.orchestrator_version is not None else "1.24.10",
+                    vnet_subnet_id=agent_pool_profile.vnet_subnet_id if agent_pool_profile.vnet_subnet_id is not None else None,
                 )
                 agent_pool_profiles_args.append(agent_pool_profile_args)
 
-        return containerservice.ManagedCluster(
-            aad_profile = aad_profile_args,
-            # addon_profiles: Optional[Mapping[str, ManagedClusterAddonProfileArgs]] = None,
-            agent_pool_profiles = agent_pool_profiles_args,
-            # api_server_access_profile: Optional[ManagedClusterAPIServerAccessProfileArgs] = None,
-            # auto_scaler_profile: Optional[ManagedClusterPropertiesAutoScalerProfileArgs] = None,
-            # auto_upgrade_profile: Optional[ManagedClusterAutoUpgradeProfileArgs] = None,
-            # disable_local_accounts: Optional[bool] = None,
-            # disk_encryption_set_id: Optional[str] = None,
-            # enable_pod_security_policy: Optional[bool] = None,
-            # enable_rbac: Optional[bool] = None,
-            # extended_location: Optional[ExtendedLocationArgs] = None,
-            # fqdn_subdomain: Optional[str] = None,
-            # http_proxy_config: Optional[ManagedClusterHTTPProxyConfigArgs] = None,
-            identity = identity_args,
-            # identity_profile = identity_profile_args,
-            # kubernetes_version: Optional[str] = None,
-            # linux_profile: Optional[ContainerServiceLinuxProfileArgs] = None,
-            # location: Optional[str] = None,
-            network_profile = network_profile_args,
-            # node_resource_group: Optional[str] = None,
-            # pod_identity_profile: Optional[ManagedClusterPodIdentityProfileArgs] = None,
-            # private_link_resources: Optional[Sequence[PrivateLinkResourceArgs]] = None,
-            resource_group_name = args.resource_group_name,
-            resource_name = self.context.get_default_resource_name(self.name) or args.resource_name,
-            location = self.context.location,
-            dns_prefix = self.context.get_default_resource_name(self.name),
-            # service_principal_profile: Optional[ManagedClusterServicePrincipalProfileArgs] = None,
-            # sku: Optional[ManagedClusterSKUArgs] = None,
-            tags = self.context.tags,
-            # windows_profile: Optional[ManagedClusterWindowsProfileArgs] = None
+        managed_cluster_args = containerservice.ManagedClusterArgs(
+            resource_group_name=args.resource_group_name or self.context.get_default_resource_name(self.name),
+            location=args.location or self.context.location,
+            dns_prefix=args.dns_prefix or self.context.get_default_resource_name(self.name),
+            kubernetes_version=args.kubernetes_version or "1.24.10",
+            enable_rbac=args.enable_rbac or True,
+            tags=args.tags or self.context.tags,
+            agent_pool_profiles=agent_pool_profiles_args,
         )
-
+    
+        return containerservice.ManagedCluster(self.context.get_default_resource_name(self.name), args=managed_cluster_args)
 #endregion
 
 class ResourceBuilder:

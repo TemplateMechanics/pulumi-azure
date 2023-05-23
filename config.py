@@ -22,6 +22,16 @@ class IdentityArgs:
     user_assigned_identities: Optional[dict[str, str]] = None
 
 @dataclass
+class AddonProfileArgs:
+    enabled: Optional[bool] = None
+    config: Optional[dict[str, str]] = None
+@dataclass
+class ManagedClusterAADProfileArgs:
+    managed: Optional[bool] = None
+    enable_azure_rbac: Optional[bool] = None
+    admin_group_object_ids: Optional[List[str]] = None
+    tenant_id: Optional[str] = None
+@dataclass
 class ManagedClusterAgentPoolProfileArgs:
     name: Optional[str] = None
     mode: Optional[str] = None
@@ -36,23 +46,11 @@ class ManagedClusterAgentPoolProfileArgs:
     os_type: Optional[str] = None
     orchestrator_version: Optional[str] = None
     vnet_subnet_id: Optional[str] = None
-    # def to_dict(self):
-    #     return asdict(self)
-@dataclass
-class AddonProfileArgs:
-    enabled: Optional[bool] = None
-    config: Optional[dict[str, str]] = None
-@dataclass
-class ManagedClusterAADProfileArgs:
-    managed: Optional[bool] = None
-    enable_azure_rbac: Optional[bool] = None
-    admin_group_object_ids: Optional[List[str]] = None
-    tenant_id: Optional[str] = None
 @dataclass
 class ManagedClusterArgs:
+    agent_pool_profiles: Optional[List[ManagedClusterAgentPoolProfileArgs]] = None
     aad_profile: Optional[ManagedClusterAADProfileArgs] = None
     addon_profiles: Optional[dict[str, AddonProfileArgs]] = None
-    agent_pool_profiles: Optional[List[ManagedClusterAgentPoolProfileArgs]] = None
     disable_local_accounts: Optional[bool] = None
     dns_prefix: Optional[str] = None
     enable_pod_security_policy: Optional[bool] = None
