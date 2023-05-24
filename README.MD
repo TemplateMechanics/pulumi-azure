@@ -122,10 +122,10 @@ teams:
                args:
                 resource_group_name: Resource rg-1, name
                 properties:
+                  enable_rbac_authorization: true
                   sku:
                     family: A
                     name: standard
-                  tenant_id: TENANT_ID
             managed_clusters:
               - name: aks1
                 args:
