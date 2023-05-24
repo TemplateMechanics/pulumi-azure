@@ -1,6 +1,7 @@
 import asyncio
 from azurenative import ResourceBuilder, BuildContext
 from config import Config
+# import pprint
 
 def read_yaml_file():
     with open("config.yaml") as config_yaml_file:
@@ -11,7 +12,7 @@ async def main():
     read_yaml : str = read_yaml_file()
     parsed_yaml : Config = Config.from_yaml(read_yaml)
 
-    #pprint.pprint(parsed_yaml)
+    # pprint.pprint(parsed_yaml)
 
     # Iterate through the teams, services, and environments in the YAML configuration
     # Each environment will contain configurations for different modules in the Pulumi Registry

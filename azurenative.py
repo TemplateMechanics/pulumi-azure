@@ -8,6 +8,7 @@ from collections.abc import Iterable
 import uuid
 import secrets
 import string
+from automapper import mapper
 
 import pulumi
 import pulumi_azure_native.resources as resources
@@ -138,11 +139,8 @@ class ResourceGroup(BaseResource):
         return resources.ResourceGroup.get(self.context.get_default_resource_name(self.name), id)
 
     async def create(self, args: config.ResourceGroupArgs) -> resources.ResourceGroup:
-        resource_group_args = resources.ResourceGroupArgs(
-            resource_group_name = args.resource_group_name or self.context.get_default_resource_name(self.name),
-            location = args.location or self.context.location,
-            tags = args.tags or self.context.tags,
-        )
+        args.location = args.location or self.context.location
+        resource_group_args = mapper.to(resources.ResourceGroupArgs).map(args, use_deepcopy=False, skip_none_values=True)
         return resources.ResourceGroup(self.context.get_default_resource_name(self.name), args=resource_group_args)
 
 class ManagedIdentity(BaseResource):
@@ -156,11 +154,10 @@ class ManagedIdentity(BaseResource):
         return managedidentity.UserAssignedIdentity.get(self.context.get_default_resource_name(self.name), id)
 
     async def create(self, args: config.ManagedIdentityArgs) -> managedidentity.UserAssignedIdentity:
-        managed_identity_args = managedidentity.UserAssignedIdentityArgs(
-            resource_group_name = args.resource_group_name or pulumi.log.warn("Resource Group Name is required for managed identity"),
-            location = args.location or self.context.location,
-            tags = args.tags or self.context.tags,
-        )
+        args.resourceGroupName = args.resource_group_name or self.context.get_default_resource_name(self.name)
+        args.location = args.location or self.context.location
+        managed_identity_args = mapper.to(managedidentity.UserAssignedIdentityArgs).map(args, use_deepcopy=False, skip_none_values=True)
+        
         return managedidentity.UserAssignedIdentity(self.context.get_default_resource_name(self.name), args=managed_identity_args)
 
 class RoleAssignment(BaseResource):
@@ -171,7 +168,7 @@ class RoleAssignment(BaseResource):
         if not id:
             return None
 
-        return authorization.RoleAssignment.get(self.name, id)
+        return authorization.RoleAssignment.get(self.context.get_default_resource_name(self.name), id)
 
     async def create(self, args: config.RoleAssignmentArgs) -> authorization.RoleAssignment:
         role_assignment_args = authorization.RoleAssignmentArgs(
@@ -182,11 +179,7 @@ class RoleAssignment(BaseResource):
             role_definition_id = args.role_definition_id or pulumi.log.warn("Role definition ID is required for role assignment"),
             scope = args.scope or pulumi.log.warn("Scope is required for role assignment"),
         )
-        return authorization.RoleAssignment(
-            self.context.get_default_resource_name(self.name), 
-            args=role_assignment_args,
-            opts=pulumi.ResourceOptions(ignore_changes=["role_assignment_name"])
-        )
+        return authorization.RoleAssignment(self.context.get_default_resource_name(self.name), args=role_assignment_args, opts=pulumi.ResourceOptions(ignore_changes=["role_assignment_name"]))
 
 class VirtualNetwork(BaseResource):
     def __init__(self, name: str, context: BuildContext):
@@ -199,18 +192,12 @@ class VirtualNetwork(BaseResource):
         return network.VirtualNetwork.get(self.context.get_default_resource_name(self.name), id)
 
     async def create(self, args: config.VirtualNetworkArgs) -> network.VirtualNetwork:
-
-        address_space_args = network.AddressSpaceArgs(
-            address_prefixes = args.address_space.address_prefixes or pulumi.log.warn("address_prefixes is required for virtual network creation"),
-        )
-
-        virtual_network_args = network.VirtualNetworkArgs(
-            resource_group_name = args.resource_group_name or pulumi.log.warn("Resource Group Name is required for virtual network"),
-            location = args.location or self.context.location,
-            address_space = address_space_args,
-            tags = args.tags or self.context.tags,
-        )
+        args.location = args.location or self.context.location
         
+        if args.address_space is not None:
+            args.address_space = mapper.to(network.AddressSpaceArgs).map(args.address_space, use_deepcopy=False, skip_none_values=True)
+        
+        virtual_network_args = mapper.to(network.VirtualNetworkArgs).map(args, use_deepcopy=False, skip_none_values=True)
         return network.VirtualNetwork(self.context.get_default_resource_name(self.name), args=virtual_network_args)
 
 class Subnet(BaseResource):
@@ -223,12 +210,10 @@ class Subnet(BaseResource):
 
         return network.Subnet.get(self.context.get_default_resource_name(self.name), id)
 
-    async def create(self, args: config.SubnetInitArgs) -> network.Subnet:
-        subnet_args = network.SubnetInitArgs(
-            resource_group_name = args.resource_group_name or pulumi.log.warn("Resource Group Name is required for subnet creation"),
-            virtual_network_name = args.virtual_network_name or pulumi.log.warn("Virtual Network Name is required for subnet creation"),
-            address_prefix = args.address_prefix or pulumi.log.warn("address_prefix is required for subnet creation"),
-        )
+    async def create(self, args: config.SubnetArgs) -> network.Subnet:
+        args.private_endpoint_network_policies = args.private_endpoint_network_policies or "Disabled"
+        args.private_link_service_network_policies = args.private_link_service_network_policies or "Disabled"
+        subnet_args = mapper.to(network.SubnetInitArgs).map(args, use_deepcopy=False, skip_none_values=True)
         return network.Subnet(self.context.get_default_resource_name(self.name), args=subnet_args)
 
 class KeyVault(BaseResource):
@@ -239,7 +224,7 @@ class KeyVault(BaseResource):
         if id is None:
             return None
 
-        return keyvault.Vault.get(self.context.get_default_resource_name(self.name), id)
+        return keyvault.Vault.get(self.name, id)
 
     async def create(self, args: config.KeyVaultArgs) -> keyvault.Vault:
         vault_properties: Optional[keyvault.VaultPropertiesArgs] = None
@@ -249,12 +234,12 @@ class KeyVault(BaseResource):
                 sku=properties.sku if properties.sku is not None else {"family": "A", "name": "standard"},
                 create_mode=properties.create_mode if properties.create_mode is not None else "default",
                 access_policies=properties.access_policies if properties.access_policies is not None else [],
-                tenant_id=properties.tenant_id if properties.tenant_id is not None else pulumi.log.warn("tenant_id is required for keyvault creation"),
+                tenant_id=properties.tenant_id if properties.tenant_id is not None else pulumi.warn("Tenant ID is required for key vault"),
                 enabled_for_deployment=properties.enabled_for_deployment if properties.enabled_for_deployment is not None else True,
                 enabled_for_disk_encryption=properties.enabled_for_disk_encryption if properties.enabled_for_disk_encryption is not None else True,
                 enabled_for_template_deployment=properties.enabled_for_template_deployment if properties.enabled_for_template_deployment is not None else True,
                 enable_rbac_authorization=properties.enable_rbac_authorization if properties.enable_rbac_authorization is not None else False,
-                enable_soft_delete=properties.enable_soft_delete if properties.enable_soft_delete is not None else False,
+                enable_soft_delete=properties.enable_soft_delete if properties.enable_soft_delete is not None else False
             )
 
         vault_args = keyvault.VaultArgs(
@@ -277,19 +262,15 @@ class ContainerRegistry(BaseResource):
 
         return containerregistry.Registry.get(self.context.get_default_resource_name(self.name), id)
 
-    async def create(self, args: config.containerregistry) -> containerregistry.Registry:
-        registry_args = containerregistry.RegistryArgs(
-            resource_group_name=args.resource_group_name or self.context.get_default_resource_name(self.name),
-            location=args.location or self.context.location,
-            sku=args.sku or containerregistry.SkuArgs(name="Standard"),
-            admin_user_enabled=args.admin_user_enabled or False,
-            network_rule_set=args.network_rule_set or {"default_action": "Allow"},
-            policies=args.policies or {"quarantine_policy": {"status": "disabled"}},
-            tags=args.tags or self.context.tags,
-        )
-
+    async def create(self, args: config.ContainerRegistryArgs) -> containerregistry.Registry:
+        args.location = args.location or self.context.location
+        args.registry_name = args.registry_name or self.context.get_default_resource_name_clean(self.name)
+        args.network_rule_set = args.network_rule_set or {"default_action": "Allow"}
+        args.sku = args.sku or containerregistry.SkuArgs(name="Standard")
+        
+        registry_args = mapper.to(containerregistry.RegistryArgs).map(args, use_deepcopy=False, skip_none_values=True)
         return containerregistry.Registry(self.context.get_default_resource_name_clean(self.name), registry_args)
-    
+
 class ManagedCluster(BaseResource):
     def __init__(self, name: str, context: BuildContext):
         super().__init__(name, context)
@@ -304,34 +285,29 @@ class ManagedCluster(BaseResource):
         agent_pool_profiles_args: list[containerservice.ManagedClusterAgentPoolProfileArgs] = []
         if args.agent_pool_profiles is not None:
             for agent_pool_profile in args.agent_pool_profiles:
-                agent_pool_profile_args = containerservice.ManagedClusterAgentPoolProfileArgs(
-                    name=agent_pool_profile.name if agent_pool_profile.name is not None else "systempool",
-                    mode=agent_pool_profile.mode if agent_pool_profile.mode is not None else "System",
-                    vm_size=agent_pool_profile.vm_size if agent_pool_profile.vm_size is not None else "Standard_b2ms",
-                    type=agent_pool_profile.type if agent_pool_profile.type is not None else "VirtualMachineScaleSets",
-                    enable_auto_scaling=agent_pool_profile.enable_auto_scaling if agent_pool_profile.enable_auto_scaling is not None else True,
-                    enable_encryption_at_host=agent_pool_profile.enable_encryption_at_host if agent_pool_profile.enable_encryption_at_host is not None else False,
-                    count=agent_pool_profile.count if agent_pool_profile.count is not None else 1,
-                    min_count=agent_pool_profile.min_count if agent_pool_profile.min_count is not None else 1,
-                    max_count=agent_pool_profile.max_count if agent_pool_profile.max_count is not None else 3,
-                    max_pods=agent_pool_profile.max_pods if agent_pool_profile.max_pods is not None else 30,
-                    os_type=agent_pool_profile.os_type if agent_pool_profile.os_type is not None else "Linux",
-                    orchestrator_version=agent_pool_profile.orchestrator_version if agent_pool_profile.orchestrator_version is not None else "1.24.10",
-                    vnet_subnet_id=agent_pool_profile.vnet_subnet_id if agent_pool_profile.vnet_subnet_id is not None else None,
-                )
+                agent_pool_profile_args = mapper.to(containerservice.ManagedClusterAgentPoolProfileArgs).map(agent_pool_profile, use_deepcopy=False, skip_none_values=True)
                 agent_pool_profiles_args.append(agent_pool_profile_args)
-
+        aad_profile = mapper.to(containerservice.ManagedClusterAADProfileArgs).map(args.aad_profile, use_deepcopy=False, skip_none_values=True)
+        # addon_profile = mapper.to(containerservice.ManagedClusterAddonProfileArgs).map(args.addon_profiles, use_deepcopy=False, skip_none_values=True)
+        if args.identity is not None:
+            identity = mapper.to(containerservice.ManagedClusterIdentityArgs).map(args.identity, use_deepcopy=False, skip_none_values=True)
+        if args.sku is not None:
+            sku = mapper.to(containerservice.ManagedClusterSKUArgs).map(args.sku, use_deepcopy=False, skip_none_values=True)
         managed_cluster_args = containerservice.ManagedClusterArgs(
-            resource_group_name=args.resource_group_name or self.context.get_default_resource_name(self.name),
+            resource_group_name=args.resource_group_name or pulumi.warn("Resource group name is required for managed cluster"),
             location=args.location or self.context.location,
             dns_prefix=args.dns_prefix or self.context.get_default_resource_name(self.name),
-            kubernetes_version=args.kubernetes_version or "1.24.10",
             enable_rbac=args.enable_rbac or True,
             tags=args.tags or self.context.tags,
             agent_pool_profiles=agent_pool_profiles_args,
+            aad_profile=aad_profile,
+            # addon_profile=addon_profile,
+            identity=identity,
+            sku=sku,
         )
     
         return containerservice.ManagedCluster(self.context.get_default_resource_name(self.name), args=managed_cluster_args)
+
 #endregion
 
 class ResourceBuilder:
@@ -344,12 +320,12 @@ class ResourceBuilder:
     async def build(self, config: config.AzureNative):
         await self.build_resource_groups(config.resource_groups)
         await self.build_managed_identities(config.managed_identities)
-        await self.build_role_assignments(config.role_assignments)
-        await self.build_key_vaults(config.key_vaults)
-        await self.build_container_registries(config.container_registries)
         await self.build_virtual_networks(config.virtual_networks)
         await self.build_subnets(config.subnets)
+        await self.build_container_registries(config.container_registries)
+        await self.build_key_vaults(config.key_vaults)
         await self.build_managed_clusters(config.managed_clusters)
+        await self.build_role_assignments(config.role_assignments)
 
     async def build_resource_groups(self, configs: Optional[list[config.ResourceGroup]] = None):
         if configs is None:
@@ -399,7 +375,7 @@ class ResourceBuilder:
             builder = KeyVault(config.name, self.context)
             await builder.build(config.id, config.args)
 
-    async def build_container_registries(self, configs: Optional[list[config.containerregistry]] = None):
+    async def build_container_registries(self, configs: Optional[list[config.ContainerRegistry]] = None):
         if configs is None:
             return
 

@@ -20,7 +20,10 @@ class NetworkProfileArgs:
 class IdentityArgs:
     type: Optional[str] = None
     user_assigned_identities: Optional[dict[str, str]] = None
-
+@dataclass
+class service_principal_profile:
+    client_id: Optional[str] = None
+    secret: Optional[str] = None
 @dataclass
 class AddonProfileArgs:
     enabled: Optional[bool] = None
@@ -62,6 +65,7 @@ class ManagedClusterArgs:
     network_profile: Optional[NetworkProfileArgs] = None
     resource_group_name: Optional[str] = None
     sku: Optional[ManagedClusterSKUArgs] = None
+    service_principal_profile: Optional[ManagedClusterServicePrincipalProfileArgs] = None
     tags: Optional[dict[str, str]] = None
     windows_profile: Optional[dict[str, str]] = None
     vnet_subnet_id: Optional[str] = None
@@ -72,7 +76,8 @@ class ManagedCluster:
     args: Optional[ManagedClusterArgs] = None
 ### https://www.pulumi.com/registry/packages/azure-native/api-docs/containerservice/managedcluster/ ###
 @dataclass
-class RegistryArgs:
+class ContainerRegistryArgs:
+    registry_name: Optional[str] = None
     resource_group_name: Optional[str] = None
     location: Optional[str] = None
     admin_user_enabled: Optional[bool] = None
@@ -81,10 +86,10 @@ class RegistryArgs:
     policies: Optional[dict[str, str]] = None
     tags: Optional[dict[str, str]] = None
 @dataclass
-class containerregistry:
+class ContainerRegistry:
     name: str
     id: Optional[str] = None
-    args: Optional[RegistryArgs] = None
+    args: Optional[ContainerRegistryArgs] = None
 ### https://www.pulumi.com/registry/packages/azure-native/api-docs/containerregistry/registry/ ###
 @dataclass
 class VaultPropertiesArgs:
@@ -111,16 +116,18 @@ class KeyVault:
     args: Optional[KeyVaultArgs] = None
 ### https://www.pulumi.com/registry/packages/azure-native/api-docs/keyvault/vault/ ###
 @dataclass
-class SubnetInitArgs:
+class SubnetArgs:
     name: Optional[str] = None
     resource_group_name: Optional[str] = None
     virtual_network_name: Optional[str] = None
     address_prefix: Optional[str] = None
+    private_endpoint_network_policies: Optional[str] = None
+    private_link_service_network_policies: Optional[str] = None
 @dataclass
 class Subnet:
     name: str
     id: Optional[str] = None
-    args: Optional[SubnetInitArgs] = None
+    args: Optional[SubnetArgs] = None
 ### https://www.pulumi.com/registry/packages/azure-native/api-docs/network/subnet/ ###
 @dataclass
 class AddressSpaceArgs:
@@ -182,7 +189,7 @@ class AzureNative:
     virtual_networks: Optional[List[VirtualNetwork]] = None
     subnets: Optional[List[Subnet]] = None
     key_vaults: Optional[List[KeyVault]] = None
-    container_registries: Optional[List[containerregistry]] = None
+    container_registries: Optional[List[ContainerRegistry]] = None
     managed_clusters: Optional[List[ManagedCluster]] = None
 ### https://www.pulumi.com/registry/packages/azure-native/ ###
 @dataclass
