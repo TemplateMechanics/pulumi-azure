@@ -281,6 +281,8 @@ class ManagedCluster(BaseResource):
         # addon_profile = mapper.to(containerservice.ManagedClusterAddonProfileArgs).map(args.addon_profiles, use_deepcopy=False, skip_none_values=True)
         if args.identity is not None:
             identity = mapper.to(containerservice.ManagedClusterIdentityArgs).map(args.identity, use_deepcopy=False, skip_none_values=True)
+        if args.network_profile is not None:
+            network_profile = mapper.to(containerservice.ContainerServiceNetworkProfileArgs).map(args.network_profile, use_deepcopy=False, skip_none_values=True)
         if args.sku is not None:
             sku = mapper.to(containerservice.ManagedClusterSKUArgs).map(args.sku, use_deepcopy=False, skip_none_values=True)
         managed_cluster_args = containerservice.ManagedClusterArgs(
@@ -293,6 +295,7 @@ class ManagedCluster(BaseResource):
             aad_profile=aad_profile,
             # addon_profile=addon_profile,
             identity=identity,
+            network_profile=network_profile,
             sku=sku,
         )
     
