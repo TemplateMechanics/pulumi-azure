@@ -82,24 +82,77 @@ An Example `config.yaml` could look like:
 
 ```yaml
 teams:
-- name: Team1
-  services:
-  - name: Service1
-    environments:
-    - name: Dev
-      location: West US
-      azure_native:
-        resource_groups:
-        - name: rg1
-          args: []
-        managed_clusters:
-        - name: Cluster1
-          args:
-            resource_group_name: Resource rg1, id
-            agent_pool_profiles:
-            - name: systempool
-              vm_size: Standard_B2s
-              count: 1
+  - name: team1
+    services:
+      - name: svc1
+        environments:
+         - name: labs
+           location: canadacentral
+           tags:
+             CreatedBy: Pulumi
+           azure_native:
+            resource_groups:
+              - name: rg-1
+                args: []
+            managed_identities:
+              - name: uai-1
+                args:
+                  resource_group_name: Resource rg-1, name
+            role_assignments:
+              - name: ra-1
+                args:
+                  principal_id: Resource uai-1, principal_id
+                  role_definition_id: /subscriptions/SUBSCRIPTION/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c
+                  scope: Resource rg-1, id
+            virtual_networks:
+              - name: vnet-1
+                args:
+                  address_space:
+                    address_prefixes:
+                      - 10.200.0.0/16
+                  resource_group_name: Resource rg-1, name
+            subnets:
+              - name: subnet-1
+                args:
+                  address_prefix: 10.200.1.0/24
+                  resource_group_name: Resource rg-1, name
+                  virtual_network_name: Resource vnet-1, name
+            key_vaults:
+             - name: kv-1
+               args:
+                resource_group_name: Resource rg-1, name
+                properties:
+                  sku:
+                    family: A
+                    name: standard
+                  tenant_id: TENANT_ID
+            managed_clusters:
+              - name: aks1
+                args:
+                  resource_group_name: Resource rg-1, name
+                  enable_rbac: true
+                  aad_profile:
+                    managed: true
+                    enable_azure_rbac: true
+                    admin_group_object_ids:
+                      - ADMIN_GROUP_OBJECT_ID
+                  identity:
+                    type: "SystemAssigned"
+                  sku:
+                    name: "Basic"
+                    tier: "Free"
+                  agent_pool_profiles:
+                    - name: "systempool"
+                      count: 1
+                      mode: "System"
+                      vm_size: "Standard_b2ms"
+                      type: "VirtualMachineScaleSets"
+                      enableAutoScaling: true
+                      enableEncryptionAtHost: false
+                      minCount: 1
+                      maxCount: 1
+                      vnet_subnet_id: Resource subnet-1, id
+                      orchestratorVersion: "1.24.10"
 ```
 This would generate a managed cluster named "Cluster1" in the resource group "RG1" in the "Dev" environment of the "Service1" service in "Team1".
 
