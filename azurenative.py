@@ -227,25 +227,15 @@ class KeyVault(BaseResource):
         return keyvault.Vault.get(self.name, id)
 
     async def create(self, args: config.KeyVaultArgs) -> keyvault.Vault:
-        vault_properties: Optional[keyvault.VaultPropertiesArgs] = None
-        if args.properties is not None:
-            properties = args.properties
-            vault_properties = keyvault.VaultPropertiesArgs(
-                sku=properties.sku if properties.sku is not None else {"family": "A", "name": "standard"},
-                create_mode=properties.create_mode if properties.create_mode is not None else "default",
-                access_policies=properties.access_policies if properties.access_policies is not None else [],
-                tenant_id=properties.tenant_id if properties.tenant_id is not None else pulumi.warn("Tenant ID is required for key vault"),
-                enabled_for_deployment=properties.enabled_for_deployment if properties.enabled_for_deployment is not None else True,
-                enabled_for_disk_encryption=properties.enabled_for_disk_encryption if properties.enabled_for_disk_encryption is not None else True,
-                enabled_for_template_deployment=properties.enabled_for_template_deployment if properties.enabled_for_template_deployment is not None else True,
-                enable_rbac_authorization=properties.enable_rbac_authorization if properties.enable_rbac_authorization is not None else False,
-                enable_soft_delete=properties.enable_soft_delete if properties.enable_soft_delete is not None else False
-            )
+        args.properties.sku = args.properties.sku or {"family": "A", "name": "standard"}
+        args.properties.tenant_id = args.properties.tenant_id or pulumi.log.warn("Tenant ID is required for key vault")
+        args.properties.enable_soft_delete = args.properties.enable_soft_delete or False
+        vault_properties = mapper.to(keyvault.VaultPropertiesArgs).map(args.properties, use_deepcopy=False, skip_none_values=True)
 
         vault_args = keyvault.VaultArgs(
+            resource_group_name=args.resource_group_name or self.context.get_default_resource_name(self.name),
             properties=vault_properties,
             vault_name=args.vault_name or self.context.get_default_resource_name(self.name),
-            resource_group_name=args.resource_group_name or self.context.get_default_resource_name(self.name),
             location=args.location or self.context.location,
             tags=args.tags or self.context.tags,
         )
@@ -267,8 +257,8 @@ class ContainerRegistry(BaseResource):
         args.registry_name = args.registry_name or self.context.get_default_resource_name_clean(self.name)
         args.network_rule_set = args.network_rule_set or {"default_action": "Allow"}
         args.sku = args.sku or containerregistry.SkuArgs(name="Standard")
-        
         registry_args = mapper.to(containerregistry.RegistryArgs).map(args, use_deepcopy=False, skip_none_values=True)
+        
         return containerregistry.Registry(self.context.get_default_resource_name_clean(self.name), registry_args)
 
 class ManagedCluster(BaseResource):
@@ -323,8 +313,8 @@ class ResourceBuilder:
         await self.build_virtual_networks(config.virtual_networks)
         await self.build_subnets(config.subnets)
         await self.build_container_registries(config.container_registries)
-        await self.build_key_vaults(config.key_vaults)
         await self.build_managed_clusters(config.managed_clusters)
+        await self.build_key_vaults(config.key_vaults)
         await self.build_role_assignments(config.role_assignments)
 
     async def build_resource_groups(self, configs: Optional[list[config.ResourceGroup]] = None):
