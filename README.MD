@@ -154,7 +154,7 @@ teams:
                       vnet_subnet_id: Resource subnet-1, id
                       orchestratorVersion: "1.24.10"
 ```
-This would generate a series of resources in Azure and shows how to use the cache system referencing properties with the shorthand.
+This would generate a series of resources in Azure and shows how to use the cache system referencing properties with the shorthand. Please fill in the appropriate values for "SUBSCRIPTION", "TENANT_ID", and "ADMIN_GROUP_OBJECT_ID".
 
 ## Explanation and Deep Dive
 
