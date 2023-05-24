@@ -154,7 +154,7 @@ teams:
                       vnet_subnet_id: Resource subnet-1, id
                       orchestratorVersion: "1.24.10"
 ```
-This would generate a managed cluster named "Cluster1" in the resource group "RG1" in the "Dev" environment of the "Service1" service in "Team1".
+This would generate a series of resources in azure and shows how to use the cache system referencing properties with the shorthand.
 
 ## Explanation and Deep Dive
 
