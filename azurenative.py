@@ -15,6 +15,8 @@ import pulumi_azure_native.resources as resources
 import pulumi_azure_native.managedidentity as managedidentity
 import pulumi_azure_native.authorization as authorization
 import pulumi_azure_native.network as network
+import pulumi_azure_native.web as web
+import pulumi_azure_native.sql as sql
 import pulumi_azure_native.keyvault as keyvault
 import pulumi_azure_native.containerservice as containerservice
 import pulumi_azure_native.containerregistry as containerregistry
@@ -46,10 +48,10 @@ class BuildContext:
     def get_default_resource_name_clean(self, unique_identifier: str) -> str:
         return self.get_default_resource_name(unique_identifier).replace("-", "")
     
-    def generate_password(length=16):
+    def generate_password(length=12):
         all_characters = string.ascii_letters + string.digits + string.punctuation
-        password = ''.join(secrets.choice(all_characters) for _ in range(length))
-        return password
+        password = "".join(secrets.choice(all_characters) for i in range(length))
+        return str(password)
 
 # region Resources
 class BaseResource(ABC):
@@ -215,6 +217,82 @@ class Subnet(BaseResource):
         args.private_link_service_network_policies = args.private_link_service_network_policies or "Disabled"
         subnet_args = mapper.to(network.SubnetInitArgs).map(args, use_deepcopy=False, skip_none_values=True)
         return network.Subnet(self.context.get_default_resource_name(self.name), args=subnet_args)
+class AppServicePlan(BaseResource):
+    def __init__(self, name: str, context: BuildContext):
+        super().__init__(name, context)
+    
+    async def find(self, id: Optional[str] = None) -> Optional[web.AppServicePlan]:
+        if id is None:
+            return None
+
+        return web.AppServicePlan.get(self.context.get_default_resource_name(self.name), id)
+
+    async def create(self, args: config.AppServicePlanArgs) -> web.AppServicePlan:
+        args.location = args.location or self.context.location
+        args.resource_group_name = args.resource_group_name or self.context.get_default_resource_name(self.name)
+        args.sku = args.sku or {"name": "F1", "tier": "Free"}
+        app_service_plan_args = mapper.to(web.AppServicePlanArgs).map(args, use_deepcopy=False, skip_none_values=True)
+        return web.AppServicePlan(self.context.get_default_resource_name(self.name), args=app_service_plan_args)
+    
+class AppService(BaseResource):
+    def __init__(self, name: str, context: BuildContext):
+        super().__init__(name, context)
+
+    async def find(self, id: Optional[str] = None) -> Optional[web.WebApp]:
+        if id is None:
+            return None
+
+        return web.WebApp.get(self.context.get_default_resource_name(self.name), id)
+
+    async def create(self, args: config.WebAppArgs) -> web.WebApp:
+        args.location = args.location or self.context.location
+        if args.site_config is not None:
+            site_config = mapper.to(web.SiteConfigArgs).map(args.site_config, use_deepcopy=False, skip_none_values=True)
+        app_service_args = web.WebAppArgs(
+            resource_group_name=args.resource_group_name or pulumi.log.warn("Resource group name is required for app service"),
+            location=args.location or self.context.location,
+            name=args.name or self.context.get_default_resource_name(self.name),
+            server_farm_id=args.server_farm_id or pulumi.log.warn("Server farm ID is required for app service"),
+            site_config=site_config,
+            tags=args.tags or self.context.tags,
+        )
+        return web.WebApp(self.context.get_default_resource_name(self.name), args=app_service_args)
+    
+class SqlServer(BaseResource):
+    def __init__(self, name: str, context: BuildContext):
+        super().__init__(name, context)
+    
+    async def find(self, id: Optional[str] = None) -> Optional[sql.Server]:
+        if id is None:
+            return None
+
+        return sql.Server.get(self.context.get_default_resource_name(self.name), id)
+    
+    async def create(self, args: config.ServerArgs) -> sql.Server:
+        args.location = args.location or self.context.location
+        args.resource_group_name = args.resource_group_name or self.context.get_default_resource_name(self.name)
+        args.version = args.version or "12.0"
+        args.administrator_login = args.administrator_login or "sqladmin"
+        args.administrator_login_password = args.administrator_login_password or pulumi.warn
+        server_args = mapper.to(sql.ServerArgs).map(args, use_deepcopy=False, skip_none_values=True)
+        return sql.Server(self.context.get_default_resource_name(self.name), args=server_args)
+
+class SqlDatabase(BaseResource):
+    def __init__(self, name: str, context: BuildContext):
+        super().__init__(name, context)
+    
+    async def find(self, id: Optional[str] = None) -> Optional[sql.Database]:
+        if id is None:
+            return None
+
+        return sql.Database.get(self.context.get_default_resource_name(self.name), id)
+    
+    async def create(self, args: config.SqlDatabaseArgs) -> sql.Database:
+        args.location = args.location or self.context.location
+        args.resource_group_name = args.resource_group_name or self.context.get_default_resource_name(self.name)
+        args.server_name = args.server_name or pulumi.log.warn("Server name is required for sql database")
+        database_args = mapper.to(sql.DatabaseArgs).map(args, use_deepcopy=False, skip_none_values=True)
+        return sql.Database(self.context.get_default_resource_name(self.name), args=database_args)
 
 class KeyVault(BaseResource):
     def __init__(self, name: str, context: BuildContext):
@@ -281,6 +359,8 @@ class ManagedCluster(BaseResource):
         # addon_profile = mapper.to(containerservice.ManagedClusterAddonProfileArgs).map(args.addon_profiles, use_deepcopy=False, skip_none_values=True)
         if args.identity is not None:
             identity = mapper.to(containerservice.ManagedClusterIdentityArgs).map(args.identity, use_deepcopy=False, skip_none_values=True)
+        if args.api_server_access_profile is not None:
+            api_server_access_profile = mapper.to(containerservice.ManagedClusterAPIServerAccessProfileArgs).map(args.api_server_access_profile, use_deepcopy=False, skip_none_values=True)
         if args.network_profile is not None:
             network_profile = mapper.to(containerservice.ContainerServiceNetworkProfileArgs).map(args.network_profile, use_deepcopy=False, skip_none_values=True)
         if args.sku is not None:
@@ -294,6 +374,7 @@ class ManagedCluster(BaseResource):
             agent_pool_profiles=agent_pool_profiles_args,
             aad_profile=aad_profile,
             # addon_profile=addon_profile,
+            api_server_access_profile=api_server_access_profile,
             identity=identity,
             network_profile=network_profile,
             sku=sku,
@@ -315,6 +396,10 @@ class ResourceBuilder:
         await self.build_managed_identities(config.managed_identities)
         await self.build_virtual_networks(config.virtual_networks)
         await self.build_subnets(config.subnets)
+        await self.build_sql_servers(config.sql_servers)
+        await self.build_sql_databases(config.sql_databases)
+        await self.build_app_service_plans(config.app_service_plans)
+        await self.build_app_services(config.app_services)
         await self.build_container_registries(config.container_registries)
         await self.build_managed_clusters(config.managed_clusters)
         await self.build_key_vaults(config.key_vaults)
@@ -358,6 +443,38 @@ class ResourceBuilder:
 
         for config in configs:
             builder = Subnet(config.name, self.context)
+            await builder.build(config.id, config.args)
+
+    async def build_sql_servers(self, configs: Optional[list[config.SqlServer]] = None):
+        if configs is None:
+            return
+
+        for config in configs:
+            builder = SqlServer(config.name, self.context)
+            await builder.build(config.id, config.args)
+
+    async def build_sql_databases(self, configs: Optional[list[config.SqlDatabase]] = None):
+        if configs is None:
+            return
+
+        for config in configs:
+            builder = SqlDatabase(config.name, self.context)
+            await builder.build(config.id, config.args)
+    
+    async def build_app_service_plans(self, configs: Optional[list[config.AppServicePlan]] = None):
+        if configs is None:
+            return
+
+        for config in configs:
+            builder = AppServicePlan(config.name, self.context)
+            await builder.build(config.id, config.args)
+
+    async def build_app_services(self, configs: Optional[list[config.WebApp]] = None):
+        if configs is None:
+            return
+
+        for config in configs:
+            builder = AppService(config.name, self.context)
             await builder.build(config.id, config.args)
 
     async def build_key_vaults(self, configs: Optional[list[config.KeyVault]] = None):
