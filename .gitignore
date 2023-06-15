@@ -1,3 +1,3 @@
 *.pyc
 venv/
-config.yaml
+config.yaml*
