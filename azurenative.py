@@ -359,8 +359,6 @@ class ManagedCluster(BaseResource):
         # addon_profile = mapper.to(containerservice.ManagedClusterAddonProfileArgs).map(args.addon_profiles, use_deepcopy=False, skip_none_values=True)
         if args.identity is not None:
             identity = mapper.to(containerservice.ManagedClusterIdentityArgs).map(args.identity, use_deepcopy=False, skip_none_values=True)
-        if args.api_server_access_profile is not None:
-            api_server_access_profile = mapper.to(containerservice.ManagedClusterAPIServerAccessProfileArgs).map(args.api_server_access_profile, use_deepcopy=False, skip_none_values=True)
         if args.network_profile is not None:
             network_profile = mapper.to(containerservice.ContainerServiceNetworkProfileArgs).map(args.network_profile, use_deepcopy=False, skip_none_values=True)
         if args.sku is not None:
@@ -374,14 +372,12 @@ class ManagedCluster(BaseResource):
             agent_pool_profiles=agent_pool_profiles_args,
             aad_profile=aad_profile,
             # addon_profile=addon_profile,
-            api_server_access_profile=api_server_access_profile,
             identity=identity,
             network_profile=network_profile,
             sku=sku,
         )
     
         return containerservice.ManagedCluster(self.context.get_default_resource_name(self.name), args=managed_cluster_args)
-
 #endregion
 
 class ResourceBuilder:
