@@ -1,29 +1,16 @@
-# config.py (Dynamically Generates Pulumi Azure Native Resource Mappings and Base Configuration)
+# config.py (Optimized for Faster Pulumi Execution)
 import pulumi
 import pulumi_azure_native as azure_native
-import inspect
 from dataclasses import dataclass
-from typing import Dict, Type, List, Optional
+from typing import Dict, Type, List
 
-# Dynamically discover all Azure Native resources available in Pulumi
-def get_all_azure_resources() -> Dict[str, Type]:
-    """Extracts all Azure resource classes from Pulumi Azure Native dynamically."""
-    resource_types = {}
-    
-    for module_name in dir(azure_native):
-        module = getattr(azure_native, module_name, None)
-        
-        if module and inspect.ismodule(module):  # Ensure it's a valid Pulumi module
-            for name, obj in inspect.getmembers(module):
-                if inspect.isclass(obj) and issubclass(obj, pulumi.CustomResource) and obj != pulumi.CustomResource:
-                    resource_types[f"{module_name}.{name}"] = obj
-    
-    return resource_types
+# Hardcode frequently used Azure resources to avoid dynamic lookup
+AZURE_RESOURCE_MAP = {
+    "resources.ResourceGroup": azure_native.resources.ResourceGroup,
+    "network.VirtualNetwork": azure_native.network.VirtualNetwork,
+    "network.Subnet": azure_native.network.Subnet
+}
 
-# Generate the mapping of Azure Native resources to Pulumi classes
-AZURE_RESOURCE_MAP = get_all_azure_resources()
-
-# Define base configuration structure
 @dataclass
 class AzureResource:
     name: str
