@@ -1,4 +1,4 @@
-pulumi>=3.0.0,<4.0.0
-pulumi-azure-native>=1.0.0,<2.0.0
-dataclass-wizard==0.22.2
-py-automapper==1.2.3
+pulumi
+pulumi-azure-native
+dataclass-wizard
+py-automapper
