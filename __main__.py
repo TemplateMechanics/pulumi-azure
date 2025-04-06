@@ -1,4 +1,3 @@
-# main.py
 import yaml
 import pulumi
 from azurenative import AzureResourceBuilder

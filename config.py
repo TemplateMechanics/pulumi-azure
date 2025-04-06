@@ -1,4 +1,3 @@
-# config.py
 """
 This module defines the data structures for our configuration.
 Currently, the dataclasses are defined for potential future integration
