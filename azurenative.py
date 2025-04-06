@@ -5,24 +5,52 @@ import re
 from typing import Any
 
 AZURE_LOCATION_ABBREVIATIONS = {
-    "eastus": "eus", "eastus2": "eus2", "westus": "wus", "westus2": "wus2", "westus3": "wus3",
-    "centralus": "cus", "northcentralus": "ncus", "southcentralus": "scus",
-    "canadacentral": "ccc", "canadaeast": "cce", "brazilsouth": "brs", "brazilsoutheast": "brse",
-    "northeurope": "ne", "westeurope": "we",
-    "uksouth": "uks", "ukwest": "ukw",
-    "francecentral": "frc", "francesouth": "frs",
-    "germanywestcentral": "gwc", "germanynorth": "gn",
-    "norwayeast": "nwe", "norwaywest": "nww", "swedencentral": "swc",
-    "switzerlandnorth": "swn", "switzerlandwest": "sww",
-    "uaenorth": "uaen", "uaecentral": "uaec",
-    "australiaeast": "aue", "australiasoutheast": "ause", "australiacentral": "auc", "australiacentral2": "auc2",
-    "japaneast": "jpe", "japanwest": "jpw",
-    "koreacentral": "kc", "koreasouth": "ks",
-    "southeastasia": "sea", "eastasia": "ea",
-    "southindia": "si", "centralindia": "ci", "westindia": "wi",
-    "southafricanorth": "san", "southafricawest": "saw",
-    "qatarcentral": "qc", "polandcentral": "plc",
-    "israelcentral": "ilc", "israelnorth": "iln"
+    "eastus": "eus",
+    "eastus2": "eus2",
+    "westus": "wus",
+    "westus2": "wus2",
+    "westus3": "wus3",
+    "centralus": "cus",
+    "northcentralus": "ncus",
+    "southcentralus": "scus",
+    "canadacentral": "ccc",
+    "canadaeast": "cce",
+    "brazilsouth": "brs",
+    "brazilsoutheast": "brse",
+    "northeurope": "ne",
+    "westeurope": "we",
+    "uksouth": "uks",
+    "ukwest": "ukw",
+    "francecentral": "frc",
+    "francesouth": "frs",
+    "germanywestcentral": "gwc",
+    "germanynorth": "gn",
+    "norwayeast": "nwe",
+    "norwaywest": "nww",
+    "swedencentral": "swc",
+    "switzerlandnorth": "swn",
+    "switzerlandwest": "sww",
+    "uaenorth": "uaen",
+    "uaecentral": "uaec",
+    "australiaeast": "aue",
+    "australiasoutheast": "ause",
+    "australiacentral": "auc",
+    "australiacentral2": "auc2",
+    "japaneast": "jpe",
+    "japanwest": "jpw",
+    "koreacentral": "kc",
+    "koreasouth": "ks",
+    "southeastasia": "sea",
+    "eastasia": "ea",
+    "southindia": "si",
+    "centralindia": "ci",
+    "westindia": "wi",
+    "southafricanorth": "san",
+    "southafricawest": "saw",
+    "qatarcentral": "qc",
+    "polandcentral": "plc",
+    "israelcentral": "ilc",
+    "israelnorth": "iln",
 }
 
 def to_snake_case(name: str) -> str:
@@ -34,6 +62,7 @@ class AzureResourceBuilder:
         self.resources = {}
 
     def get_abbreviation(self, location: str) -> str:
+        # If the location is recognized, use abbreviation; else fallback to first 3 letters
         return AZURE_LOCATION_ABBREVIATIONS.get(location.lower(), location[:3].lower())
 
     def generate_resource_name(self, base_name: str) -> str:
@@ -60,13 +89,16 @@ class AzureResourceBuilder:
                         new_list.append(item)
                 resolved_args[key] = new_list
             elif isinstance(value, str) and value.startswith("ref:"):
+                # handle "ref:resourceName.attribute"
                 ref_text = value[4:]
                 if "." in ref_text:
                     ref_res, ref_attr = ref_text.split(".", 1)
                 else:
                     ref_res, ref_attr = (ref_text, "id")
+
                 if ref_res not in self.resources:
                     raise ValueError(f"Referenced resource '{ref_res}' not found.")
+
                 resource_obj = self.resources[ref_res]
                 attr_val = getattr(resource_obj, ref_attr, None)
                 if attr_val is None:
@@ -87,7 +119,7 @@ class AzureResourceBuilder:
             is_existing = args.pop("existing", False)
             resolved_args = self.resolve_args(args)
 
-            module_name, class_name = resource_type.rsplit('.', 1)
+            module_name, class_name = resource_type.rsplit(".", 1)
             module = getattr(azure_native, module_name, None)
             if not module:
                 pulumi.log.warn(f"Azure module '{module_name}' not found. Skipping '{name}'.")
@@ -96,9 +128,14 @@ class AzureResourceBuilder:
             try:
                 ResourceClass = getattr(module, class_name)
             except AttributeError:
-                pulumi.log.warn(f"Resource class '{class_name}' not found in module '{module_name}'. Skipping '{name}'.")
+                pulumi.log.warn(
+                    f"Resource class '{class_name}' not found in module '{module_name}'. Skipping '{name}'."
+                )
                 continue
 
+            init_sig = inspect.signature(ResourceClass.__init__)
+
+            # If the resource is marked as existing, attempt a dynamic get_* function
             if is_existing:
                 get_func_name = f"get_{to_snake_case(class_name)}"
                 try:
@@ -107,6 +144,7 @@ class AzureResourceBuilder:
                     valid_params = set(sig.parameters.keys())
                     required_params = valid_params - {"opts"}
 
+                    # Filter resolved_args for what the get_* function actually needs
                     get_params = {
                         k: v for k, v in resolved_args.items() if k in required_params
                     }
@@ -115,7 +153,7 @@ class AzureResourceBuilder:
                     if missing:
                         pulumi.log.warn(
                             f"Missing required params {missing} for existing resource '{name}'. "
-                            "Skipping the lookup attempt."
+                            f"Skipping the lookup attempt."
                         )
                     else:
                         existing_resource = get_func(**get_params)
@@ -134,7 +172,14 @@ class AzureResourceBuilder:
                         f"Failed to retrieve existing resource '{name}': {e}. Proceeding with creation."
                     )
 
-            init_sig = inspect.signature(ResourceClass.__init__)
+                # << KEY FIX >>
+                # If the lookup fails, we are about to create a new resource. 
+                # So if location is in the constructor signature, ensure we have it:
+                if "location" in init_sig.parameters and "location" not in resolved_args:
+                    # Use top-level config or a fallback default
+                    resolved_args["location"] = self.config.get("location", "eastus")
+                else:
+                    resolved_args.pop("location", None)
 
             # Check if resource supports 'tags'
             if "tags" in init_sig.parameters:
@@ -144,18 +189,18 @@ class AzureResourceBuilder:
             else:
                 resolved_args.pop("tags", None)
 
-            # We'll keep 'location' for ResourceGroup, but remove for Subnet or if constructor lacks it.
-            # Instead of dynamic approach, let's do a known list approach:
-            no_location_types = {"network.Subnet"}
-            if resource_type in no_location_types:
-                resolved_args.pop("location", None)
-            else:
-                # If ResourceClass does require location, we set it if not present.
-                # Usually ResourceGroup, VNet do require 'location'.
+            # If resource constructor expects location, ensure it's present or fallback
+            if "location" in init_sig.parameters:
                 if "location" not in resolved_args:
                     resolved_args["location"] = self.config.get("location", "eastus")
+            else:
+                resolved_args.pop("location", None)
 
             pulumi_name = self.generate_resource_name(name)
+
+            # Debug log to confirm final arguments used:
+            pulumi.log.info(f"DEBUG for '{name}': final resolved_args => {resolved_args}")
+
             resource_instance = ResourceClass(pulumi_name, **resolved_args)
             self.resources[name] = resource_instance
             pulumi.log.info(f"Created resource: {pulumi_name} ({resource_type})")
