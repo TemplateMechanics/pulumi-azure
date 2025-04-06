@@ -1,15 +1,15 @@
-# Pulumi YAML-Based Infrastructure Builder
+# Pulumi YAML-Based Infrastructure Builder for Azure
 
-This project provides a dynamic and extensible Pulumi-based infrastructure-as-code solution for Azure, fully configured using a YAML file. It automatically manages resource naming, supports referencing existing resources, allows dynamic linking between resources, and is easily extensible to additional cloud providers.
+This project provides a dynamic and extensible Pulumi-based infrastructure-as-code solution for Azure, fully configured using a YAML file. It automatically manages resource naming (with custom name overrides), supports referencing existing resources, allows dynamic linking between resources, and integrates secret resolution via Pulumi configuration.
 
 ## 📂 Project Structure
 
 ```
 .
 ├── __main__.py         # Entry point: parses YAML and builds resources
-├── azurenative.py      # Azure-specific logic and naming standards
+├── azurenative.py      # Azure-specific logic, naming standards, and secret resolution
 ├── config.py           # Dataclasses and dynamic Pulumi resource mapping
-├── config.yaml         # User-defined infrastructure config
+├── config.yaml         # User-defined infrastructure configuration
 └── README.md           # Documentation (this file)
 ```
 
@@ -18,11 +18,13 @@ This project provides a dynamic and extensible Pulumi-based infrastructure-as-co
 ## 🚀 Features
 
 - **YAML-defined infrastructure**: Define all infrastructure clearly in YAML.
-- **Dynamic Pulumi resource mapping**: No need to explicitly hardcode resource types.
-- **Intelligent resource naming**: Automatically incorporates team, service, environment, and region abbreviations.
-- **Azure region abbreviation**: Converts full Azure region names (e.g., `eastus`) into standardized abbreviations (`eus`).
+- **Dynamic Pulumi resource mapping**: Automatically maps YAML definitions to Pulumi resource classes.
+- **Intelligent resource naming**: Automatically incorporates team, service, environment, and location abbreviations.
+- **Azure region abbreviation**: Converts full Azure region names (e.g., `eastus`) into standardized abbreviations (e.g., `eus`).
 - **Resource referencing**: Use `ref:<resource-name>.<attribute>` syntax to dynamically link resources.
-- **New and existing resources**: Seamlessly create new resources or fetch existing ones from Azure.
+- **New and existing resources**: Seamlessly create new resources or fetch existing ones.
+- **Custom name overrides**: Override generated names with a `custom_name` field for resources with strict naming rules.
+- **Secret resolution**: Use `secret:<key>` in your YAML to securely reference sensitive data from Pulumi configuration.
 
 ---
 
@@ -63,19 +65,23 @@ azure_resources:
       resource_group_name: "ref:existing-rg.name"
       virtual_network_name: "ref:vnet-01.name"
       address_prefix: "10.0.0.0/24"
+
+  - name: "sqlserver-01"
+    type: "sql.SqlServer"
+    args:
+      administrator_login: "adminUser"
+      administrator_login_password: "secret:sqlServerPassword"
 ```
 
 ---
 
 ## 🛠 Getting Started
 
-Initialize Pulumi and deploy your infrastructure:
-
 ```bash
 pulumi login
 pulumi stack init dev
 pulumi config set azure-native:location eastus
-
+pulumi config set sqlServerPassword YOUR_SECRET_VALUE --secret
 pulumi up
 ```
 
@@ -83,7 +89,7 @@ pulumi up
 
 ## 🔗 Referencing Resources
 
-Use the syntax `ref:<resource-name>.<attribute>` in YAML to dynamically reference outputs from previously defined resources.
+Use the syntax `ref:<resource-name>.<attribute>` to dynamically reference outputs from previously defined resources.
 
 Example:
 
@@ -91,8 +97,6 @@ Example:
 resource_group_name: "ref:rg-01.name"
 virtual_network_name: "ref:vnet-01.name"
 ```
-
-This ensures dynamic resolution instead of static values.
 
 ---
 
@@ -104,85 +108,33 @@ Resource names follow the pattern:
 <team>-<service>-<environment>-<location-abbr>-<resource-name>
 ```
 
-**Example**:
+**Example:**
 
 ```
 devops-test-svc-dev-eus-vnet-01
 ```
 
-Azure location abbreviations are automatically handled internally (`eastus` → `eus`).
-
 ---
 
 ## ⚙️ Dynamic Resource Resolution
 
-The system automatically introspects Pulumi Azure Native packages (`pulumi_azure_native`) to dynamically map resources without explicitly defining resource classes. This simplifies management and allows automatic inclusion of new resources as Pulumi updates.
+The system automatically introspects Pulumi Azure Native packages (`pulumi_azure_native`) to dynamically map resources without explicit resource class definitions, simplifying management and ensuring new resources are available as Pulumi updates.
 
 ---
 
 ## ✨ Potential Enhancements
 
 - **Reusable YAML templates** for resource patterns.
-- **Multi-region and multi-environment** support.
-- **Dependency visualization** to clearly show resource relationships.
-- **Pre-execution YAML validation** to prevent errors.
-
----
-
-## 🌐 Multi-Provider Support
-
-This solution is structured to easily extend support to other cloud providers beyond Azure. Each provider can have a dedicated builder module, allowing the project to manage infrastructure across multiple clouds consistently from a single YAML configuration.
-
-### Suggested Directory Structure
-
-```
-project-root/
-├── azure/
-│   └── builder.py
-├── aws/
-│   └── builder.py
-├── gcp/
-│   └── builder.py
-├── config.yaml
-└── main.py
-```
-
-### `config.yaml` Example for Providers
-
-```yaml
-provider: "azure"  # or "aws", "gcp", etc.
-```
-
-### Dynamic Provider Import (`main.py`)
-
-```python
-provider = config_data.get("provider", "azure")
-
-if provider == "aws":
-    from aws.builder import AWSResourceBuilder as ResourceBuilder
-elif provider == "gcp":
-    from gcp.builder import GCPResourceBuilder as ResourceBuilder
-else:
-    from azure.builder import AzureResourceBuilder as ResourceBuilder
-
-builder = ResourceBuilder(config_data)
-builder.build()
-```
-
-Each provider-specific builder (`builder.py`) should:
-
-- Define its resource mapping and naming strategy.
-- Manage region abbreviations and resource conventions.
-- Handle resource reference linking.
+- **Multi-region and multi-environment support**.
+- **Dependency visualization** for resource relationships.
+- **Pre-execution YAML validation**.
 
 ---
 
 ## 👥 Authors & Contributors
 
-This approach follows the **Benitez-Johnson Method**, developed by:
-
+Developed using the **Benitez-Johnson Method** by:
 - **Dave Johnson**
 - **Christian Benitez**
 
 Special thanks to **Brandon Rutledge** for architecture and implementation contributions.
-
