@@ -1,4 +1,3 @@
-pulumi
-pulumi-azure-native
-dataclass-wizard
-py-automapper
+pulumi>=3.0.0
+pulumi-aws>=4.0.0
+PyYAML>=5.4.1
